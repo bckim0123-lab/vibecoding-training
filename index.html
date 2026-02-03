@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>바이브코딩 훈련소</title>
+    <link rel="stylesheet" href="style.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- 파티클 배경 -->
+    <canvas id="particles-canvas"></canvas>
+    
+    <div class="container">
+      <!-- 메인 화면 -->
+      <div id="start-screen" class="screen active">
+        <div class="main-content">
+          <!-- 왼쪽: CSS 로봇 -->
+          <div class="robot-section">
+            <div class="robot-glow-effect"></div>
+            
+            <!-- 3D 홀로그램 링 -->
+            <div class="hologram-rings">
+              <div class="holo-ring ring-1"></div>
+              <div class="holo-ring ring-2"></div>
+              <div class="holo-ring ring-3"></div>
+            </div>
+            
+            <!-- 떠다니는 3D 아이콘 -->
+            <div class="floating-3d-icons">
+              <div class="icon-3d icon-code">{ }</div>
+              <div class="icon-3d icon-ai">🤖</div>
+              <div class="icon-3d icon-rocket">🚀</div>
+              <div class="icon-3d icon-brain">🧠</div>
+              <div class="icon-3d icon-lightning">⚡</div>
+              <div class="icon-3d icon-star">✨</div>
+            </div>
+            
+            <div class="css-robot-container" id="css-robot">
+              <!-- 안테나 -->
+              <div class="robot-antenna">
+                <div class="antenna-ball"></div>
+              </div>
+              
+              <!-- 머리 -->
+              <div class="robot-head">
+                <div class="head-display">READY</div>
+                <div class="robot-eyes">
+                  <div class="eye left-eye"></div>
+                  <div class="eye right-eye"></div>
+                </div>
+                <div class="robot-mouth"></div>
+                <div class="robot-cheek left-cheek"></div>
+                <div class="robot-cheek right-cheek"></div>
+              </div>
+              
+              <!-- 몸통 -->
+              <div class="robot-body">
+                <div class="body-star">⭐</div>
+                <div class="body-display">STANDBY</div>
+                <div class="body-screen"></div>
+                <div class="body-leds">
+                  <div class="led red-led"></div>
+                  <div class="led yellow-led"></div>
+                  <div class="led green-led"></div>
+                </div>
+              </div>
+            </div>
+            <div class="floating-particles">
+              <span class="particle" style="--delay: 0s; --duration: 3s;">✨</span>
+              <span class="particle" style="--delay: 1s; --duration: 4s;">💫</span>
+              <span class="particle" style="--delay: 2s; --duration: 3.5s;">⭐</span>
+              <span class="particle" style="--delay: 0.5s; --duration: 4.5s;">🌟</span>
+            </div>
+          </div>
+
+          <!-- 오른쪽: 콘텐츠 -->
+          <div class="content-section">
+            <!-- 헤더 -->
+            <div class="header">
+              <div class="logo-badge">💎</div>
+              <h1 class="main-title glitch" data-text="바이브코딩 훈련소">바이브코딩 훈련소</h1>
+              <p class="subtitle typing-effect">AI 교관과 함께하는 실전 테스트</p>
+            </div>
+
+            <!-- 인사말 -->
+            <div class="welcome-box card-3d">
+              <div class="welcome-icon">👋</div>
+              <p>안녕하세요, 훈련병! 저는 <strong class="highlight">바이브 코칭</strong>입니다. 바이브코딩의 세계에 오신 것을 환영합니다! 다재다능한 바이브 코딩 실력을 갖게 되실 것을 환영합니다! 👍</p>
+            </div>
+
+            <!-- 훈련 과목 -->
+            <div class="training-modules">
+              <h3 class="section-title">
+                <span class="title-icon">📋</span>
+                <span class="title-text">훈련 과목 (10문제)</span>
+              </h3>
+              
+              <div class="modules-grid">
+                <div class="module-card card-3d" data-module="1">
+                  <div class="module-header">
+                    <span class="module-icon">📝</span>
+                    <span class="module-badge">핵심 개념</span>
+                  </div>
+                  <p class="module-desc">바이브 코딩의 정의와 패러다임</p>
+                  <div class="module-shine"></div>
+                </div>
+
+                <div class="module-card card-3d" data-module="2">
+                  <div class="module-header">
+                    <span class="module-icon">🎨</span>
+                    <span class="module-badge">개발 기초</span>
+                  </div>
+                  <p class="module-desc">프론트엔드, 백엔드, API, DB</p>
+                  <div class="module-shine"></div>
+                </div>
+
+                <div class="module-card card-3d" data-module="3">
+                  <div class="module-header">
+                    <span class="module-icon">🤖</span>
+                    <span class="module-badge">AI 용어</span>
+                  </div>
+                  <p class="module-desc">LLM, 프롬프트, 컨텍스트, 할루시네이션</p>
+                  <div class="module-shine"></div>
+                </div>
+
+                <div class="module-card card-3d" data-module="4">
+                  <div class="module-header">
+                    <span class="module-icon">🛠️</span>
+                    <span class="module-badge">실전 도구</span>
+                  </div>
+                  <p class="module-desc">Cursor, Claude Code, Antigravity</p>
+                  <div class="module-shine"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 시작 버튼 -->
+            <button id="start-btn" class="start-button">
+              <span class="button-content">
+                <span class="button-icon">⚡</span>
+                <span class="button-text">훈련 시작 (10문제)</span>
+              </span>
+              <div class="button-ripple"></div>
+            </button>
+
+            <!-- 하단 텍스트 -->
+            <div class="footer-text">
+              <span class="footer-icon">🤖</span>
+              바이브코딩 훈련소 v2.0 | AI 교관 시스템 | Based on Official Documentation
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 퀴즈 화면 -->
+      <div id="quiz-screen" class="screen">
+        <div class="quiz-container">
+          <div class="quiz-header">
+            <div class="progress-section">
+              <div class="progress-info">
+                <span id="question-number" class="question-num">문제 1/10</span>
+                <span class="progress-percentage" id="progress-percentage">10%</span>
+              </div>
+              <div class="progress-bar-wrapper">
+                <div class="progress-bar" id="progress-bar">
+                  <div class="progress-glow"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="question-container" class="question-container">
+            <h2 id="question-text" class="question-text">Loading...</h2>
+            <div id="options-container" class="options-list">
+              <!-- 옵션 버튼들이 동적으로 생성됩니다 -->
+            </div>
+          </div>
+          
+          <div id="feedback" class="feedback-container hidden">
+            <div class="feedback-content">
+              <div class="feedback-icon-wrapper" id="feedback-icon-wrapper">
+                <div class="feedback-icon" id="feedback-icon"></div>
+              </div>
+              <p id="feedback-message" class="feedback-message"></p>
+              <p id="explanation-text" class="explanation-text"></p>
+            </div>
+            <button id="next-btn" class="next-button">
+              <span>다음 문제</span>
+              <span class="arrow">→</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 결과 화면 -->
+      <div id="result-screen" class="screen">
+        <div class="result-container">
+          <div class="result-header">
+            <div class="result-badge">🎉</div>
+            <h2 class="result-title">훈련 완료!</h2>
+            <p class="result-subtitle">당신의 바이브코딩 실력은?</p>
+          </div>
+          
+          <div class="score-display">
+            <div class="score-ring">
+              <svg class="score-circle-svg" width="240" height="240">
+                <circle class="score-bg" cx="120" cy="120" r="100" />
+                <circle class="score-fill" id="score-circle" cx="120" cy="120" r="100" />
+              </svg>
+              <div class="score-content">
+                <span id="final-score" class="final-score">0</span>
+                <span class="score-label">점</span>
+              </div>
+            </div>
+            <p class="score-max">/ 100점</p>
+          </div>
+          
+          <div class="result-feedback card-3d">
+            <div class="robot-avatar-result">
+              <img src="assets/robot-instructor.png" alt="AI 교관" class="avatar-img-small" />
+            </div>
+            <p id="instructor-text" class="instructor-message"></p>
+          </div>
+          
+          <button id="restart-btn" class="restart-button">
+            <span class="button-icon">🔄</span>
+            <span>다시 도전하기</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
