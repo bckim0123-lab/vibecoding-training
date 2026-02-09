@@ -471,7 +471,7 @@ class VideoController {
     this.passVideo = document.getElementById("pass-video");
     this.failVideo = document.getElementById("fail-video");
     this.skipBtn = document.getElementById("skip-btn");
-    this.errorMsg = document.getElementById("video-error-msg");
+    // this.errorMsg = document.getElementById("video-error-msg"); // 제거됨
     this.enterBtn = document.getElementById("enter-btn");
     this.introOverlay = document.getElementById("intro-overlay");
     this.robot = document.getElementById("css-robot");
@@ -647,13 +647,14 @@ class VideoController {
 
   handleError(e) {
     console.error("Video Error:", e);
-    this.errorMsg.classList.remove("hidden");
+    // 경고 문구 UI 표시 제거 (사용자 요청)
+    // this.errorMsg.classList.remove("hidden");
 
-    // 3초 후 자동 스킵
+    // 3초 후 자동 스킵 (에러 발생 시 사용자 경험 저하 방지)
     setTimeout(() => {
-      this.errorMsg.classList.add("hidden");
+      // this.errorMsg.classList.add("hidden");
       this.skipVideo();
-    }, 3000);
+    }, 1000); // 대기 시간 단축
   }
 
   // 로봇 위치 이동 (오버레이로)

@@ -30,22 +30,16 @@
     <!-- 비디오 오버레이 시스템 -->
     <div id="video-overlay" class="video-overlay hidden">
       <div class="video-container">
-        <video id="intro-video" class="video-player" playsinline>
+        <video id="intro-video" class="video-player" playsinline preload="auto">
           <source src="assets/video-intro.mp4" type="video/mp4" />
         </video>
-        <video id="pass-video" class="video-player hidden" playsinline>
+        <video id="pass-video" class="video-player hidden" playsinline preload="auto">
           <source src="assets/video-pass.mp4" type="video/mp4" />
         </video>
-        <video id="fail-video" class="video-player hidden" playsinline>
+        <video id="fail-video" class="video-player hidden" playsinline preload="auto">
           <source src="assets/video-fail.mp4" type="video/mp4" />
         </video>
         <button id="skip-btn" class="skip-btn hidden">Skip >></button>
-        <div id="video-error-msg" class="video-error hidden">
-          <p>
-            영상 재생에 문제가 발생했습니다. <br />잠시 후 다음 단계로
-            이동합니다.
-          </p>
-        </div>
       </div>
     </div>
 
