@@ -328,6 +328,8 @@ function showQuestion() {
   question.options.forEach((option, index) => {
     const button = document.createElement("button");
     button.classList.add("option-btn");
+    // 순차적 등장을 위한 딜레이 설정
+    button.style.animationDelay = `${index * 0.1}s`;
     button.innerHTML = `
       <span class="option-idx">${String.fromCharCode(65 + index)}</span>
       <span>${option}</span>
@@ -380,7 +382,7 @@ function selectOption(index) {
       });
     }
   } else {
-    buttons[index].classList.add("wrong");
+    buttons[index].classList.add("incorrect"); // 'wrong' -> 'incorrect' 클래스명 수정
     buttons[question.answer].classList.add("correct");
     feedbackIcon.innerText = "❌";
     feedbackMessage.innerText = "아쉽네요...";
