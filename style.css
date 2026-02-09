@@ -35,7 +35,7 @@ body {
   align-items: center;
   position: relative;
   overflow-x: hidden;
-  perspective: 1000px;
+  /* perspective: 1000px; - 3D 효과를 위해 컨테이너로 이동 */
 }
 
 /* 파티클 배경 캔버스 */
@@ -82,6 +82,7 @@ body::before {
   position: relative;
   z-index: 1;
   padding: 20px;
+  perspective: 1000px; /* body에서 이동됨 */
 }
 
 .screen {
@@ -1268,10 +1269,9 @@ body::before {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
-  /* 모바일 브라우저 주소창 대응 */
-  height: 100dvh;
+  width: 100%; /* 100vw -> 100% 변경 (스크롤바 이슈 방지) */
+  height: 100%;
+  height: 100dvh; /* 모바일 브라우저 주소창 대응 */
   background-color: #000; /* 불투명 배경 */
   z-index: 9999;
   display: flex;
@@ -1352,8 +1352,9 @@ body::before {
   position: fixed;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%; /* 100vw -> 100% 변경 */
+  height: 100%; /* 100vh -> 100% 변경 */
+  height: 100dvh; /* 모바일 대응 추가 */
   background-color: var(--bg-dark);
   z-index: 10000; /* 비디오보다 위 */
   display: flex;
