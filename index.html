@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>바이브코딩 훈련소</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="style_append.css" />
+    <link rel="stylesheet" href="style_guide.css" />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css"
@@ -30,7 +32,13 @@
     <!-- 비디오 오버레이 시스템 -->
     <div id="video-overlay" class="video-overlay hidden">
       <div class="video-container">
-        <video id="intro-video" class="video-player" playsinline preload="auto">
+        <video
+          id="intro-video"
+          class="video-player hidden"
+          playsinline
+          preload="auto"
+          style="width: 100%; height: 100%; object-fit: contain"
+        >
           <source src="assets/video-intro.mp4" type="video/mp4" />
         </video>
         <video
@@ -38,6 +46,7 @@
           class="video-player hidden"
           playsinline
           preload="auto"
+          style="width: 100%; height: 100%; object-fit: contain"
         >
           <source src="assets/video-pass.mp4" type="video/mp4" />
         </video>
@@ -46,10 +55,47 @@
           class="video-player hidden"
           playsinline
           preload="auto"
+          style="width: 100%; height: 100%; object-fit: contain"
         >
           <source src="assets/video-fail.mp4" type="video/mp4" />
         </video>
         <button id="skip-btn" class="skip-btn hidden">Skip >></button>
+      </div>
+    </div>
+
+    <!-- 학습하기 모달 -->
+    <div id="study-modal" class="study-modal hidden">
+      <div class="study-modal-content card-3d">
+        <div class="study-header">
+          <h2 id="study-title" class="study-title">제목</h2>
+          <button id="close-study-btn" class="close-study-btn">×</button>
+        </div>
+        <div id="study-body" class="study-body">
+          <!-- 내용 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 게임 가이드 팝업 (Start Button 누르면 표시) -->
+    <div id="game-guide-modal" class="guide-modal hidden">
+      <div class="guide-content card-3d">
+        <h2 class="guide-title">📢 훈련 지침</h2>
+        <div class="guide-text">
+          <p>1. 총 10개의 문제가 랜덤하게 출제됩니다.</p>
+          <p>2. 제한 시간 내에 정답을 선택하세요.</p>
+          <p>3. <span class="warning-text">하트 3개가 모두 소진되면 훈련 실패 처리됩니다.</span></p>
+          <p>4. 높은 점수로 진급에 도전하세요!</p>
+        </div>
+        <div class="guide-options">
+          <label class="checkbox-label">
+            <input type="checkbox" id="dont-show-guide" />
+            <span>다시 보지 않기</span>
+          </label>
+        </div>
+        <button id="guide-start-btn" class="guide-btn">훈련 시작</button>
+        <div class="guide-timer-bar">
+          <div id="guide-timer-progress" class="guide-progress"></div>
+        </div>
       </div>
     </div>
 
@@ -152,10 +198,20 @@
             <div class="training-modules">
               <h3 class="section-title">
                 <span class="title-icon">📋</span>
-                <span class="title-text">훈련 과목 (10문제)</span>
+                <span class="title-text">훈련 과목 (랜덤 10문제)</span>
               </h3>
 
-              <div class="modules-grid">
+              <!-- 학습하기 섹션 -->
+              <div class="study-section">
+                <p class="study-guide">
+                  ※ 훈련 전 아래 내용을 클릭하여 학습하세요.
+                </p>
+                <div class="study-grid" id="study-grid">
+                  <!-- JS로 동적 생성됨 -->
+                </div>
+              </div>
+
+              <div class="modules-grid hidden">
                 <div class="module-card card-3d" data-module="1">
                   <div class="module-header">
                     <span class="module-icon">📝</span>
@@ -199,8 +255,8 @@
             <!-- 시작 버튼 -->
             <button id="start-btn" class="start-button">
               <span class="button-content">
-                <span class="button-icon">⚡</span>
-                <span class="button-text">훈련 시작 (10문제)</span>
+                <span class="button-icon">🚀</span>
+                <span class="button-text">전투 배치 (Deploy)</span>
               </span>
               <div class="button-ripple"></div>
             </button>
@@ -218,18 +274,35 @@
       <!-- 퀴즈 화면 -->
       <div id="quiz-screen" class="screen">
         <div class="quiz-container">
+          <div class="game-header">
+            <div class="hp-container">
+              <span class="hp-label">HP</span>
+              <div class="hp-hearts" id="hp-hearts">
+                <span class="heart active">❤️</span>
+                <span class="heart active">❤️</span>
+                <span class="heart active">❤️</span>
+              </div>
+            </div>
+            <div class="timer-container">
+              <div class="timer-bar-bg">
+                <div class="timer-bar" id="timer-bar"></div>
+              </div>
+              <span class="timer-text" id="timer-text">15</span>
+            </div>
+            <div class="score-container">
+              <span class="score-label">SCORE</span>
+              <span class="score-value" id="current-score">0</span>
+            </div>
+          </div>
+          <div class="combo-container hidden" id="combo-container">
+            <span class="combo-count" id="combo-count">0</span>
+            <span class="combo-label">COMBO!</span>
+          </div>
+
           <div class="quiz-header">
             <div class="progress-section">
               <div class="progress-info">
                 <span id="question-number" class="question-num">문제 1/10</span>
-                <span class="progress-percentage" id="progress-percentage"
-                  >10%</span
-                >
-              </div>
-              <div class="progress-bar-wrapper">
-                <div class="progress-bar" id="progress-bar">
-                  <div class="progress-glow"></div>
-                </div>
               </div>
             </div>
           </div>
@@ -239,6 +312,18 @@
             <div id="options-container" class="options-list">
               <!-- 옵션 버튼들이 동적으로 생성됩니다 -->
             </div>
+          </div>
+
+          <div class="skills-container">
+            <button
+              id="skill-btn"
+              class="skill-btn"
+              title="AI Co-pilot: 오답 2개 제거"
+            >
+              <span class="skill-icon">🤖</span>
+              <span class="skill-name">AI Co-pilot</span>
+              <span class="skill-status" id="skill-status">READY</span>
+            </button>
           </div>
 
           <div id="feedback" class="feedback-container hidden">
@@ -263,7 +348,8 @@
           <div class="result-header">
             <div class="result-badge">🎉</div>
             <h2 class="result-title">훈련 완료!</h2>
-            <p class="result-subtitle">당신의 바이브코딩 실력은?</p>
+            <p class="result-subtitle">최종 계급</p>
+            <h3 id="rank-display" class="rank-display">훈련병</h3>
           </div>
 
           <div class="score-display">
@@ -283,7 +369,6 @@
                 <span class="score-label">점</span>
               </div>
             </div>
-            <p class="score-max">/ 100점</p>
           </div>
 
           <div class="result-feedback card-3d">
@@ -301,12 +386,18 @@
             <span class="button-icon">🔄</span>
             <span>다시 도전하기</span>
           </button>
+
+          <button id="share-btn" class="share-button">
+            <span class="button-icon">🔗</span>
+            <span>결과 공유하기</span>
+          </button>
         </div>
       </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
+    <script src="quiz_data.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
