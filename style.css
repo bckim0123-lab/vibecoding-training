@@ -1618,6 +1618,60 @@ body.boss-mode {
   }
 }
 
+/* 콤보 팝업 */
+.combo-popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 4rem;
+  font-weight: 900;
+  color: #ff00de;
+  text-shadow:
+    0 0 10px #fff,
+    0 0 20px #ff00de,
+    0 0 40px #ff00de;
+  z-index: 10000;
+  pointer-events: none;
+  font-family: "JetBrains Mono", monospace;
+  animation: combo-popup-anim 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275)
+    forwards;
+}
+
+@keyframes combo-popup-anim {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5) rotate(-10deg);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.5) rotate(10deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    opacity: 0;
+  }
+}
+
+/* 보스 모드 스타일 강화 */
+body.boss-mode {
+  box-shadow: inset 0 0 100px rgba(239, 68, 68, 0.5);
+}
+
+body.boss-mode .game-header {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+}
+
+body.boss-mode .timer-bar {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+body.boss-mode .option-btn:hover {
+  border-color: rgba(239, 68, 68, 0.8);
+  background: rgba(239, 68, 68, 0.1);
+}
+
 /* 비디오 오버레이 */
 .video-overlay {
   position: fixed;

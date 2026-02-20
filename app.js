@@ -627,10 +627,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!quiz) return;
 
-    // Boss Mode Check
-    if (quiz.difficulty === "Boss") {
+    // Boss Mode Check (10번 문제)
+    if (GameState.currentQuizIndex === 9 || quiz.difficulty === "Boss") {
       document.body.classList.add("boss-mode");
       GameState.isBossMode = true;
+      
+      if (SoundManager.bgmOscillators.length > 0) {
+          const ctx = SoundManager.audioContext;
+          SoundManager.bgmOscillators.forEach(osc => {
+              if (osc.frequency.value < 150) { // Base A2 is 110
+                 osc.frequency.linearRampToValueAtTime(osc.frequency.value * 1.5, ctx.currentTime + 2);
+              }
+          });
+      }
     } else {
       document.body.classList.remove("boss-mode");
       GameState.isBossMode = false;
@@ -763,6 +772,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (UI.timerBar) UI.timerBar.style.width = `${percentage}%`;
     if (UI.timerText) UI.timerText.textContent = Math.ceil(GameState.timeLeft);
 
+    // 긴박감 연출 (5초 미만)
+    if (GameState.timeLeft <= 5) {
+      if (UI.timerBar) UI.timerBar.classList.add("warning");
+      if (UI.timerText) {
+        UI.timerText.style.color = "#ef4444";
+        UI.timerText.style.animation = "timer-blink 0.5s infinite";
+      }
+    } else {
+      if (UI.timerBar) UI.timerBar.classList.remove("warning");
+      if (UI.timerText) {
+        UI.timerText.style.color = "var(--primary-cyan)";
+        UI.timerText.style.animation = "none";
+      }
+    }
+
     if (percentage < 30 && UI.timerBar) {
       UI.timerBar.style.backgroundColor = "#ef4444"; // Red
     } else if (UI.timerBar) {
@@ -774,6 +798,13 @@ document.addEventListener("DOMContentLoaded", () => {
     SoundManager.play("wrong");
     GameState.combo = 0;
     GameState.hp--;
+    
+    // 시각 효과: 화면 흔들림 (Screen Shake)
+    document.body.classList.remove("shake");
+    void document.body.offsetWidth;
+    document.body.classList.add("shake");
+    setTimeout(() => document.body.classList.remove("shake"), 500);
+
     updateHUD();
 
     const currentQuizId = GameState.quizOrder[GameState.currentQuizIndex];
@@ -838,6 +869,30 @@ document.addEventListener("DOMContentLoaded", () => {
     GameState.score += baseScore + comboBonus + timeBonus;
     GameState.combo++;
 
+    // 콤보 팝업 애니메이션
+    if (GameState.combo > 1) {
+      const comboText = document.createElement("div");
+      comboText.className = "combo-popup";
+      comboText.textContent = `${GameState.combo} COMBO!`;
+      document.body.appendChild(comboText);
+      setTimeout(() => comboText.remove(), 1000);
+    }
+
+    // Confetti Effect (canvas-confetti)
+    if (typeof confetti === "function") {
+      const rect = UI.optionsContainer.querySelector(".correct").getBoundingClientRect();
+      const x = (rect.left + rect.width / 2) / window.innerWidth;
+      const y = (rect.top + rect.height / 2) / window.innerHeight;
+      
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { x, y },
+        colors: ["#00e5ff", "#ff00de", "#ff1493"],
+        disableForReducedMotion: true
+      });
+    }
+
     // 시각 효과: 파티클 효과 (Robot Interaction)
     const robot = document.getElementById("css-robot");
     if (robot) {
@@ -865,13 +920,11 @@ document.addEventListener("DOMContentLoaded", () => {
     GameState.combo = 0;
     GameState.hp--;
 
-    // 시각 효과: 화면 흔들림 및 붉은 섬광
-    const container = document.querySelector(".container");
-    if (container) {
-      container.classList.remove("shake");
-      void container.offsetWidth; // Force Reflow
-      container.classList.add("shake");
-    }
+    // 시각 효과: 화면 흔들림 (Screen Shake)
+    document.body.classList.remove("shake");
+    void document.body.offsetWidth; // Force Reflow
+    document.body.classList.add("shake");
+    setTimeout(() => document.body.classList.remove("shake"), 500);
 
     // 시각 효과: 화면 플래시 (Red)
     const flash = document.createElement("div");
