@@ -37,8 +37,15 @@ document.addEventListener("DOMContentLoaded", () => {
     isBossMode: false,
     lastTimerSound: 0,
     // 캐릭터 정보
-    playerName: "훈련병",
+    playerName: localStorage.getItem("vibe_player_name") || "훈련병",
     playerColor: "cyan",
+    wrongAnswers: [],
+    pendingFail: false,
+    lastRankTitle: "훈련병",
+    correctCount: 0,
+    answeredCount: 0,
+    studiedCategories: new Set(),
+    studyBonusSeconds: 0,
   };
 
   // ==========================================================================
@@ -179,35 +186,65 @@ document.addEventListener("DOMContentLoaded", () => {
   const VideoManager = {
     currentVideo: null,
 
+    hasPlayableSource(video) {
+      if (!video) return false;
+      if (video.error) return false;
+      const source = video.querySelector("source");
+      return !!(source && source.getAttribute("src"));
+    },
+
     play(videoId, onEndCallback) {
       const video = document.getElementById(videoId);
       const overlay = document.getElementById("video-overlay");
       const skipBtn = document.getElementById("skip-btn");
 
-      if (!video || !overlay) return;
-
-      // 이전 비디오 정지 및 모든 비디오 숨김 (안전장치)
-      this.stop();
-
-      this.currentVideo = video;
-      overlay.classList.remove("hidden");
-      video.classList.remove("hidden");
-
-      if (skipBtn) skipBtn.classList.remove("hidden");
-
-      video.currentTime = 0;
-      // Promise 오류 처리: 재생 실패 시에도 콜백이 호출되도록 하거나 로그 출력
-      video.play().catch((err) => {
-        console.error("Video play error:", err);
-        // 자동 재생 정책 등으로 실패할 경우, 사용자가 Skip 버튼을 누르도록 유도하거나
-        // 상황에 따라 바로 콜백을 호출할 수도 있음.
-        // 여기서는 비디오가 안 나와도 진행이 멈추지 않도록 로그만 남김.
-      });
-
-      video.onended = () => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
         this.stop();
         if (onEndCallback) onEndCallback();
       };
+
+      if (!video || !overlay || !this.hasPlayableSource(video)) {
+        finish();
+        return;
+      }
+
+      this.stop();
+      this.currentVideo = video;
+      video.onended = finish;
+      video.onerror = finish;
+
+      let shown = false;
+      const reveal = () => {
+        if (finished || shown) return;
+        shown = true;
+        overlay.classList.remove("hidden");
+        video.classList.remove("hidden");
+        if (skipBtn) skipBtn.classList.remove("hidden");
+      };
+
+      // canplay 이후에만 오버레이 표시 → 없는 파일이면 검정 화면 없이 즉시 진행
+      const onCanPlay = () => {
+        if (finished) return;
+        reveal();
+        video.currentTime = 0;
+        const p = video.play();
+        if (p && typeof p.catch === "function") p.catch(finish);
+      };
+
+      video.addEventListener("canplay", onCanPlay, { once: true });
+      try {
+        video.load();
+      } catch (e) {
+        finish();
+        return;
+      }
+
+      setTimeout(() => {
+        if (!finished && !shown) finish();
+      }, 500);
     },
 
     stop() {
@@ -303,7 +340,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // Character Modal
     charModal: document.getElementById("character-screen"),
     charNameInput: document.getElementById("char-name-input"),
-    charColorBtns: document.querySelectorAll(".color-btn"),
     charCreateBtn: document.getElementById("char-create-btn"),
     previewRobot: document.getElementById("preview-robot"),
 
@@ -321,6 +357,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function initGame() {
     SoundManager.init();
+    initParticles();
 
     // 화면 꺼짐 방지 (Wake Lock API)
     requestWakeLock();
@@ -334,28 +371,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (UI.enterBtn) UI.enterBtn.addEventListener("click", playIntro);
     if (UI.skipBtn)
       UI.skipBtn.addEventListener("click", () => VideoManager.skip());
-    // Start Button -> Show Guide or Start Game
+    // Start Button -> 이름 있으면 바로 훈련, 없으면 캐릭터 생성
     if (UI.startBtn) {
-      UI.startBtn.addEventListener("click", showCharacterCreation);
+      UI.startBtn.addEventListener("click", onDeployClick);
+      updateDeployButtonLabel();
     }
     if (UI.guideStartBtn) UI.guideStartBtn.addEventListener("click", startGame);
 
     if (UI.restartBtn) UI.restartBtn.addEventListener("click", restartGame);
     if (UI.shareBtn) UI.shareBtn.addEventListener("click", shareResult);
-    if (UI.nextBtn) UI.nextBtn.addEventListener("click", loadNextQuiz);
+    if (UI.nextBtn) UI.nextBtn.addEventListener("click", handleNextButton);
     if (UI.skillBtn) UI.skillBtn.addEventListener("click", useSkill);
 
     // Character Creation Events
     if (UI.charCreateBtn)
       UI.charCreateBtn.addEventListener("click", completeCharacterCreation);
-    if (UI.charColorBtns) {
-      UI.charColorBtns.forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          const color = e.target.dataset.color;
-          selectCharacterColor(color);
-        });
-      });
-    }
 
     // Ranking Events
     if (UI.showRankingBtn)
@@ -412,17 +442,33 @@ document.addEventListener("DOMContentLoaded", () => {
   function handleGlobalKeydown(e) {
     const key = e.key;
 
-    // 1. Video Playing -> Skip
-    if (
-      VideoManager.currentVideo &&
-      !VideoManager.currentVideo.paused &&
-      !VideoManager.currentVideo.classList.contains("hidden")
-    ) {
-      if (key === " " || key === "Enter") {
-        VideoManager.skip();
+    // Esc: 모달 닫기
+    if (key === "Escape") {
+      if (UI.studyModal && !UI.studyModal.classList.contains("hidden")) {
+        closeStudyModal();
         e.preventDefault();
         return;
       }
+      if (UI.rankingModal && !UI.rankingModal.classList.contains("hidden")) {
+        UI.rankingModal.classList.add("hidden");
+        e.preventDefault();
+        return;
+      }
+      if (UI.guideModal && !UI.guideModal.classList.contains("hidden")) {
+        // 가이드는 실수로 닫지 않음
+      }
+    }
+
+    // 1. Video overlay visible -> Skip
+    const videoOverlay = document.getElementById("video-overlay");
+    if (
+      videoOverlay &&
+      !videoOverlay.classList.contains("hidden") &&
+      (key === " " || key === "Enter" || key === "Escape")
+    ) {
+      VideoManager.skip();
+      e.preventDefault();
+      return;
     }
 
     // 2. Intro Screen -> Enter to Start
@@ -438,7 +484,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 3. Game Playing Shortcuts
     if (GameState.gameStatus === "PLAYING") {
-      // Options 1-4
       if (["1", "2", "3", "4"].includes(key)) {
         const index = parseInt(key) - 1;
         const buttons = UI.optionsContainer.querySelectorAll(".option-btn");
@@ -447,7 +492,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // Space -> Next Question (if feedback is visible)
       if (
         (key === " " || key === "Enter") &&
         UI.feedback &&
@@ -461,6 +505,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // 4. Result Screen -> Restart
     if (
       GameState.gameStatus === "END" &&
+      Screens.result &&
       Screens.result.classList.contains("active")
     ) {
       if (key === "Enter" || key === " ") {
@@ -468,6 +513,26 @@ document.addEventListener("DOMContentLoaded", () => {
         e.preventDefault();
       }
     }
+  }
+
+  function updateDeployButtonLabel() {
+    if (!UI.startBtn) return;
+    const label = UI.startBtn.querySelector(".button-text");
+    if (!label) return;
+    const saved = (localStorage.getItem("vibe_player_name") || "").trim();
+    label.textContent = saved
+      ? `${saved}, 바로 훈련 시작!`
+      : "전투 배치 (Deploy)";
+  }
+
+  function onDeployClick() {
+    const saved = (localStorage.getItem("vibe_player_name") || "").trim();
+    if (saved) {
+      GameState.playerName = saved;
+      handleStartButton();
+      return;
+    }
+    showCharacterCreation();
   }
 
   function requestWakeLock() {
@@ -495,6 +560,34 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Study Mode Logic ---
+  const STUDY_META = {
+    "기초 이론": { icon: "📝", desc: "디렉팅, Vibe Loop, 검증 책임" },
+    "개발 기초": { icon: "🎨", desc: "프론트엔드, 백엔드, API, DB" },
+    "핵심 용어": { icon: "🤖", desc: "LLM, 프롬프트, 컨텍스트, 할루시네이션" },
+    "실전 도구": { icon: "🛠️", desc: "Cursor Agent, Claude Code, Rules, MCP" },
+    "심화 개념": { icon: "🚀", desc: "Git, MCP, RAG, 검증 습관" },
+    프로세스: { icon: "🔄", desc: "지시 → 생성 → 검증 → 반복" },
+  };
+
+  function getStudiedSet() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem("vibe_studied_cats") || "[]"));
+    } catch (e) {
+      return new Set();
+    }
+  }
+
+  function markStudied(category) {
+    const set = getStudiedSet();
+    set.add(category);
+    try {
+      localStorage.setItem("vibe_studied_cats", JSON.stringify([...set]));
+    } catch (e) {
+      /* ignore */
+    }
+    initStudyMode();
+  }
+
   function initStudyMode() {
     if (!UI.studyGrid) return;
     UI.studyGrid.innerHTML = "";
@@ -506,26 +599,174 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    Object.keys(QUIZ_SOURCE).forEach((category) => {
+    const studied = getStudiedSet();
+    const cats = Object.keys(QUIZ_SOURCE);
+    const doneCount = cats.filter((c) => studied.has(c)).length;
+
+    const progress = document.createElement("div");
+    progress.className = "study-progress-banner";
+    const bonusSec = Math.min(doneCount, 6) * 2;
+    progress.innerHTML = `
+      <span>📚 학습 진행 ${doneCount}/${cats.length}</span>
+      <span class="study-progress-hint">${
+        doneCount === cats.length
+          ? `전 과목 완료! 타이머 +${bonusSec}초 · HP+1 · 학습 힌트`
+          : doneCount > 0
+            ? `보너스: 타이머 +${bonusSec}초 · 학습 과목 보기 힌트`
+            : "과목 학습 → 타이머 연장 + 보기 힌트"
+      }</span>
+    `;
+    UI.studyGrid.appendChild(progress);
+
+    cats.forEach((category) => {
+      const meta = STUDY_META[category] || {
+        icon: "📚",
+        desc: "클릭하여 학습하기",
+      };
+      const done = studied.has(category);
       const card = document.createElement("div");
-      card.className = "study-card card-3d";
+      card.className = `study-card card-3d${done ? " studied" : ""}`;
+      card.setAttribute("role", "button");
+      card.setAttribute("tabindex", "0");
+      card.setAttribute("aria-label", `${category} 학습하기`);
       card.innerHTML = `
-            <div class="study-card-icon">📚</div>
+            <div class="study-card-icon">${meta.icon}</div>
             <h3 class="study-card-title">${category}</h3>
-            <p class="study-card-desc">클릭하여 학습하기</p>
+            <p class="study-card-desc">${meta.desc}</p>
+            <span class="study-card-badge">${done ? "✅ 학습 완료" : "읽기 · 미니퀴즈"}</span>
           `;
-      card.addEventListener("click", () => openStudyModal(category));
+      const open = () => openStudyModal(category);
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          open();
+        }
+      });
       UI.studyGrid.appendChild(card);
     });
+  }
+
+  // --- Background Particles ---
+  function initParticles() {
+    const canvas = document.getElementById("particles-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let particles = [];
+    const count = 55;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: Math.random() * 2 + 0.5,
+        vx: (Math.random() - 0.5) * 0.4,
+        vy: (Math.random() - 0.5) * 0.4,
+        a: Math.random() * 0.5 + 0.2,
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach((p, i) => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 229, 255, ${p.a})`;
+        ctx.fill();
+
+        for (let j = i + 1; j < particles.length; j++) {
+          const q = particles[j];
+          const dx = p.x - q.x;
+          const dy = p.y - q.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 120) {
+            ctx.strokeStyle = `rgba(0, 229, 255, ${0.15 * (1 - dist / 120)})`;
+            ctx.lineWidth = 0.6;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(q.x, q.y);
+            ctx.stroke();
+          }
+        }
+      });
+      requestAnimationFrame(draw);
+    }
+    draw();
   }
 
   function openStudyModal(category) {
     if (!UI.studyModal || !QUIZ_SOURCE[category]) return;
 
     UI.studyTitle.textContent = category;
-    UI.studyBody.innerHTML = QUIZ_SOURCE[category].summary;
+    const data = QUIZ_SOURCE[category];
+    const pool = data.questions || [];
+    const sample = pool[Math.floor(Math.random() * pool.length)] || pool[0];
+    if (!sample) return;
 
-    // 애니메이션 효과와 함께 보이기
+    // 본문 + 미니퀴즈(학습 확인)
+    UI.studyBody.innerHTML = `
+      ${data.summary}
+      <div class="mini-quiz" id="mini-quiz">
+        <h3>⚡ 30초 미니퀴즈 — 이해했는지 확인!</h3>
+        <p class="mini-quiz-q">${sample.question}</p>
+        <div class="mini-quiz-choices" id="mini-quiz-choices"></div>
+        <p class="mini-quiz-feedback hidden" id="mini-quiz-feedback"></p>
+        <button type="button" class="mini-quiz-complete hidden" id="mini-quiz-complete">
+          학습 완료하고 닫기 ✅
+        </button>
+      </div>
+    `;
+
+    const choicesEl = document.getElementById("mini-quiz-choices");
+    const feedbackEl = document.getElementById("mini-quiz-feedback");
+    const completeBtn = document.getElementById("mini-quiz-complete");
+
+    sample.choices.forEach((text, index) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mini-quiz-btn";
+      btn.textContent = text;
+      btn.addEventListener("click", () => {
+        const correct = index === sample.answer;
+        choicesEl.querySelectorAll("button").forEach((b) => (b.disabled = true));
+        btn.classList.add(correct ? "correct" : "wrong");
+        if (!correct) {
+          const right = choicesEl.children[sample.answer];
+          if (right) right.classList.add("correct");
+        }
+        feedbackEl.classList.remove("hidden");
+        feedbackEl.textContent = correct
+          ? `정답! ${sample.explanation}`
+          : `아쉬워요. ${sample.explanation}`;
+        feedbackEl.style.color = correct ? "var(--success)" : "var(--error)";
+        completeBtn.classList.remove("hidden");
+        if (correct) SoundManager.play("correct");
+        else SoundManager.play("wrong");
+      });
+      choicesEl.appendChild(btn);
+    });
+
+    completeBtn.addEventListener("click", () => {
+      markStudied(category);
+      closeStudyModal();
+    });
+
     UI.studyModal.classList.remove("hidden");
   }
 
@@ -540,7 +781,11 @@ document.addEventListener("DOMContentLoaded", () => {
     showScreen("character");
     updateRobotPreview(0);
     const nameInput = document.getElementById("char-name-input");
-    if (nameInput) nameInput.value = "";
+    if (nameInput) {
+      // 저장된 코드네임 자동 채움 (재도전 마찰 축소)
+      nameInput.value = localStorage.getItem("vibe_player_name") || "";
+      nameInput.focus();
+    }
   };
 
   // 내부 함수 유지를 위해 (기존 참조 호환성)
@@ -576,6 +821,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     GameState.playerName = name;
+    try {
+      localStorage.setItem("vibe_player_name", name);
+    } catch (e) {
+      /* ignore */
+    }
+    updateDeployButtonLabel();
     showScreen("start");
     applyCharacterStyle(0);
     handleStartButton();
@@ -604,19 +855,20 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // --- Ranking Logic (시드 고정 + localStorage 영구 저장) ---
+  // 현실적인 점수대 (대략 만점 ~2100 전후) — 유저가 상위권에 오를 수 있게
   const SEED_RANKINGS = [
-    { name: "바이브교관", score: 2800, date: "2026-01-15T10:00:00.000Z", seed: true },
-    { name: "디렉터김", score: 2400, date: "2026-01-20T12:00:00.000Z", seed: true },
-    { name: "Cursor마스터", score: 2100, date: "2026-02-01T09:30:00.000Z", seed: true },
-    { name: "프롬프트왕", score: 1800, date: "2026-02-10T14:00:00.000Z", seed: true },
-    { name: "검증병장", score: 1500, date: "2026-02-28T16:45:00.000Z", seed: true },
-    { name: "루프훈련병", score: 1200, date: "2026-03-05T11:20:00.000Z", seed: true },
-    { name: "MCP탐험가", score: 900, date: "2026-03-12T08:10:00.000Z", seed: true },
-    { name: "Git세이브", score: 600, date: "2026-03-20T19:00:00.000Z", seed: true },
+    { name: "바이브교관", score: 1680, date: "2026-08-01T10:00:00.000Z", seed: true },
+    { name: "디렉터김", score: 1520, date: "2026-08-02T12:00:00.000Z", seed: true },
+    { name: "Cursor마스터", score: 1410, date: "2026-08-03T09:30:00.000Z", seed: true },
+    { name: "프롬프트왕", score: 1280, date: "2026-08-04T14:00:00.000Z", seed: true },
+    { name: "검증병장", score: 1150, date: "2026-08-05T16:45:00.000Z", seed: true },
+    { name: "루프훈련병", score: 980, date: "2026-08-06T11:20:00.000Z", seed: true },
+    { name: "MCP탐험가", score: 860, date: "2026-08-07T08:10:00.000Z", seed: true },
+    { name: "Git세이브", score: 720, date: "2026-08-08T19:00:00.000Z", seed: true },
   ];
 
   const RankingManager = {
-    storageKey: "vibecoding_ranking_v2",
+    storageKey: "vibecoding_ranking_v3",
     maxStored: 50,
 
     ensureSeeded(list) {
@@ -701,7 +953,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (filter === "monthly") {
         return all.filter((r) => {
-          if (r.seed) return true; // 시드는 항상 노출
+          if (r.seed) return false; // 월간은 실제 기록만
           const d = new Date(r.date);
           return (
             d.getMonth() === now.getMonth() &&
@@ -711,7 +963,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else if (filter === "weekly") {
         const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         return all.filter((r) => {
-          if (r.seed) return true; // 시드는 항상 노출
+          if (r.seed) return false; // 주간은 실제 기록만
           return new Date(r.date) >= oneWeekAgo;
         });
       }
@@ -746,19 +998,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     data.slice(0, 10).forEach((item, index) => {
       const div = document.createElement("div");
-      div.className = "rank-item arcade-item"; // 아케이드 스타일 클래스 추가
+      div.className = "rank-item arcade-item";
 
       const dateStr = new Date(item.date).toLocaleDateString();
 
-      // 1~3위 특별 아이콘
       let rankIcon = index + 1;
       if (index === 0) rankIcon = "1ST 👑";
       if (index === 1) rankIcon = "2ND";
       if (index === 2) rankIcon = "3RD";
 
+      const nameLabel = item.seed
+        ? `${item.name} <span class="seed-badge">NPC</span>`
+        : item.name;
+
       div.innerHTML = `
             <span class="rank-col-rank">${rankIcon}</span>
-            <span class="rank-col-name">${item.name}</span>
+            <span class="rank-col-name">${nameLabel}</span>
             <span class="rank-col-score">${item.score.toLocaleString()}</span>
             <span class="rank-col-date">${dateStr}</span>
           `;
@@ -771,37 +1026,71 @@ document.addEventListener("DOMContentLoaded", () => {
   function generateQuizData() {
     if (typeof QUIZ_SOURCE === "undefined") return [];
 
-    let allQuestions = [];
+    const categories = Object.keys(QUIZ_SOURCE);
+    const selectedQuestions = [];
+    const used = new Set();
 
-    // 모든 카테고리에서 문제 수집
-    Object.keys(QUIZ_SOURCE).forEach((category) => {
-      const questions = QUIZ_SOURCE[category].questions.map((q) => ({
+    // 카테고리별 1문항씩 우선 배정 (균형 출제)
+    categories.forEach((category) => {
+      const pool = QUIZ_SOURCE[category].questions.map((q, i) => ({
         ...q,
-        category: category,
+        category,
+        _key: `${category}-${i}`,
       }));
-      allQuestions = allQuestions.concat(questions);
+      shuffleArray(pool);
+      if (pool[0] && selectedQuestions.length < 10) {
+        selectedQuestions.push(pool[0]);
+        used.add(pool[0]._key);
+      }
     });
 
-    // 전체 문제 셔플
+    // 나머지 랜덤 보충 (카테고리당 최대 2문항으로 편중 완화)
+    const catCount = {};
+    selectedQuestions.forEach((q) => {
+      catCount[q.category] = (catCount[q.category] || 0) + 1;
+    });
+
+    let allQuestions = [];
+    categories.forEach((category) => {
+      QUIZ_SOURCE[category].questions.forEach((q, i) => {
+        const key = `${category}-${i}`;
+        if (!used.has(key)) {
+          allQuestions.push({ ...q, category, _key: key });
+        }
+      });
+    });
     shuffleArray(allQuestions);
 
-    const selectedQuestions = allQuestions.slice(0, 10);
+    const take = (maxPerCat) => {
+      for (let i = 0; i < allQuestions.length && selectedQuestions.length < 10; ) {
+        const q = allQuestions[i];
+        const n = catCount[q.category] || 0;
+        if (n >= maxPerCat) {
+          i++;
+          continue;
+        }
+        selectedQuestions.push(q);
+        used.add(q._key);
+        catCount[q.category] = n + 1;
+        allQuestions.splice(i, 1);
+      }
+    };
+    take(2);
+    // 그래도 부족하면 제한 해제하고 채움
+    while (selectedQuestions.length < 10 && allQuestions.length > 0) {
+      selectedQuestions.push(allQuestions.shift());
+    }
+
+    shuffleArray(selectedQuestions);
 
     // 각 문제에 대해 보기 셔플 및 정답 인덱스 업데이트
     return selectedQuestions.map((q, index) => {
-      // 보기와 원래 인덱스를 묶어서 객체 배열 생성
       const choicesWithIndex = q.choices.map((text, originalIdx) => ({
         text,
         originalIdx,
       }));
-
-      // 보기 셔플
       shuffleArray(choicesWithIndex);
-
-      // 셔플된 보기 텍스트 배열
       const newChoices = choicesWithIndex.map((c) => c.text);
-
-      // 정답 인덱스 찾기 (원래 정답 인덱스와 일치하는 항목의 새 인덱스)
       const newAnswer = choicesWithIndex.findIndex(
         (c) => c.originalIdx === q.answer,
       );
@@ -813,7 +1102,7 @@ document.addEventListener("DOMContentLoaded", () => {
         choices: newChoices,
         answer: newAnswer,
         explanation: q.explanation,
-        difficulty: "Normal", // 난이도는 일단 Normal로 통일
+        difficulty: "Normal",
       };
     });
   }
@@ -873,13 +1162,31 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // 학습 보너스: 완료 과목당 +2초(최대 +12), 전 과목이면 HP+1
+    const studied = getStudiedSet();
+    const studiedCount = studied.size;
+    GameState.studiedCategories = studied;
+    GameState.studyBonusSeconds = Math.min(studiedCount, 6) * 2;
+    GameState.maxTime = 15 + GameState.studyBonusSeconds;
+    GameState.maxHp = studiedCount >= 6 ? 4 : 3;
+
     GameState.hp = GameState.maxHp;
     GameState.score = 0;
     GameState.combo = 0;
+    GameState.maxCombo = 0;
     GameState.currentQuizIndex = 0;
     GameState.gameStatus = "PLAYING";
     GameState.skillUsed = false;
     GameState.isBossMode = false;
+    GameState.wrongAnswers = [];
+    GameState.pendingFail = false;
+    GameState.lastRankTitle = "훈련병";
+    GameState.correctCount = 0;
+    GameState.answeredCount = 0;
+    if (UI.nextBtn) {
+      UI.nextBtn.innerHTML =
+        "<span>다음 문제</span><span class=\"arrow\">→</span>";
+    }
 
     // Reset Skill UI
     if (UI.skillBtn) {
@@ -895,6 +1202,20 @@ document.addEventListener("DOMContentLoaded", () => {
     SoundManager.play("bgm");
     showScreen("quiz");
 
+    if (GameState.studyBonusSeconds > 0 || GameState.maxHp > 3) {
+      const toast = document.createElement("div");
+      toast.className = "rankup-toast";
+      const bits = [];
+      if (GameState.studyBonusSeconds > 0) {
+        bits.push(`타이머 +${GameState.studyBonusSeconds}초`);
+      }
+      if (GameState.maxHp > 3) bits.push("HP +1");
+      bits.push("학습 과목 힌트");
+      toast.textContent = `📚 학습 보너스: ${bits.join(" · ")}`;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 2200);
+    }
+
     loadNextQuiz();
   }
 
@@ -903,7 +1224,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (UI.feedback) UI.feedback.classList.add("hidden");
 
     if (GameState.currentQuizIndex >= GameState.quizOrder.length) {
-      endGame(true);
+      // 10문제 완료: 정답률 80% 이상이면 합격
+      const accuracy =
+        (GameState.correctCount / Math.max(QUIZ_DATA.length, 1)) * 100;
+      endGame(accuracy >= 80);
       return;
     }
 
@@ -939,6 +1263,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 문제 표시
     UI.questionNum.textContent = `문제 ${GameState.currentQuizIndex + 1}/${QUIZ_DATA.length}`;
+    const categoryBadge = document.getElementById("question-category");
+    if (categoryBadge) {
+      categoryBadge.textContent = quiz.category || "훈련";
+      categoryBadge.classList.remove("hidden");
+    }
+    const progressFill = document.getElementById("quiz-progress-bar");
+    if (progressFill) {
+      const pct =
+        ((GameState.currentQuizIndex + 1) / Math.max(QUIZ_DATA.length, 1)) *
+        100;
+      progressFill.style.width = `${pct}%`;
+    }
+    const accuracyHud = document.getElementById("accuracy-hud");
+    if (accuracyHud) {
+      const answered = GameState.answeredCount;
+      const acc =
+        answered > 0
+          ? Math.round((GameState.correctCount / answered) * 100)
+          : 100;
+      accuracyHud.textContent = `정답률 ${acc}% (${GameState.correctCount}/${answered || 0}) · 합격 80%`;
+    }
     UI.questionText.textContent = quiz.question;
 
     // 코드 블록 처리
@@ -965,6 +1310,21 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderChoices(quiz) {
     UI.optionsContainer.innerHTML = "";
 
+    // 학습한 카테고리 문제: 오답 보기 1개 자동 제거(소프트 힌트)
+    let studyHintIndex = -1;
+    if (
+      quiz.category &&
+      GameState.studiedCategories &&
+      GameState.studiedCategories.has(quiz.category)
+    ) {
+      const wrongs = quiz.choices
+        .map((_, i) => i)
+        .filter((i) => i !== quiz.answer);
+      if (wrongs.length > 0) {
+        studyHintIndex = wrongs[Math.floor(Math.random() * wrongs.length)];
+      }
+    }
+
     quiz.choices.forEach((choiceText, index) => {
       const btn = document.createElement("button");
       btn.className = "option-btn";
@@ -975,7 +1335,13 @@ document.addEventListener("DOMContentLoaded", () => {
         <span class="option-text">${choiceText}</span>
       `;
 
-      btn.addEventListener("click", () => checkAnswer(index, quiz));
+      if (index === studyHintIndex) {
+        btn.disabled = true;
+        btn.classList.add("eliminated", "study-hint");
+        btn.title = "학습 보너스: 오답 제거";
+      } else {
+        btn.addEventListener("click", () => checkAnswer(index, quiz));
+      }
       UI.optionsContainer.appendChild(btn);
     });
   }
@@ -988,13 +1354,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!quiz) return;
 
-    // 정답이 아닌 보기들 찾기
+    const buttons = UI.optionsContainer.querySelectorAll(".option-btn");
+
+    // 아직 살아있는 오답만 제거 후보
     const wrongIndices = [];
     quiz.choices.forEach((_, index) => {
-      if (index !== quiz.answer) wrongIndices.push(index);
+      if (index === quiz.answer) return;
+      if (buttons[index] && buttons[index].disabled) return;
+      wrongIndices.push(index);
     });
 
-    // 2개 랜덤 선택
     const removedIndices = [];
     while (removedIndices.length < 2 && wrongIndices.length > 0) {
       const randIdx = Math.floor(Math.random() * wrongIndices.length);
@@ -1002,13 +1371,10 @@ document.addEventListener("DOMContentLoaded", () => {
       wrongIndices.splice(randIdx, 1);
     }
 
-    // UI 업데이트 (버튼 비활성화)
-    const buttons = UI.optionsContainer.querySelectorAll(".option-btn");
     removedIndices.forEach((idx) => {
       if (buttons[idx]) {
         buttons[idx].disabled = true;
-        buttons[idx].style.opacity = "0.3";
-        buttons[idx].style.textDecoration = "line-through";
+        buttons[idx].classList.add("eliminated");
       }
     });
 
@@ -1086,12 +1452,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function recordWrongAnswer(quiz, reason) {
+    if (!quiz) return;
+    GameState.wrongAnswers.push({
+      question: quiz.question,
+      category: quiz.category || "",
+      explanation: quiz.explanation || "",
+      reason: reason || "wrong",
+    });
+  }
+
+  function showScorePopup(baseScore, comboBonus, timeBonus) {
+    const el = document.createElement("div");
+    el.className = "score-popup";
+    const parts = [`+${baseScore}`];
+    if (comboBonus > 0) parts.push(`콤보 +${comboBonus}`);
+    if (timeBonus > 0) parts.push(`시간 +${timeBonus}`);
+    el.innerHTML = parts.map((p) => `<span>${p}</span>`).join("");
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 1200);
+  }
+
+  function maybeCelebrateRankUp() {
+    const rank = calculateRank(GameState.score);
+    if (rank.title !== GameState.lastRankTitle) {
+      GameState.lastRankTitle = rank.title;
+      SoundManager.play("levelup");
+      const toast = document.createElement("div");
+      toast.className = "rankup-toast";
+      toast.textContent = `진급! ${rank.title}`;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 1600);
+      applyCharacterStyle(GameState.score);
+      if (typeof confetti === "function") {
+        confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: [rank.color, "#00e5ff", "#ffd700"],
+        });
+      }
+    }
+  }
+
   function handleTimeOut() {
     SoundManager.play("wrong");
     GameState.combo = 0;
     GameState.hp--;
 
-    // 시각 효과: 화면 흔들림 (Screen Shake)
     document.body.classList.remove("shake");
     void document.body.offsetWidth;
     document.body.classList.add("shake");
@@ -1102,10 +1510,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const currentQuizId = GameState.quizOrder[GameState.currentQuizIndex];
     const quiz = QUIZ_DATA.find((q) => q.id === currentQuizId);
 
-    showFeedback(false, quiz);
+    // 타임아웃 시에도 정답 표시 + 버튼 잠금
+    if (UI.optionsContainer && quiz) {
+      const buttons = UI.optionsContainer.querySelectorAll("button");
+      buttons.forEach((btn) => (btn.disabled = true));
+      if (buttons[quiz.answer]) buttons[quiz.answer].classList.add("correct");
+    }
 
-    // Check Game Over
-    checkGameOver();
+    GameState.answeredCount++;
+    recordWrongAnswer(quiz, "timeout");
+    showFeedback(false, quiz, "시간 초과! 해설을 확인하세요.");
+
+    const isOver = checkGameOver();
+    if (!isOver) {
+      GameState.currentQuizIndex++;
+    }
   }
 
   function checkAnswer(selectedIndex, quiz) {
@@ -1115,16 +1534,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const isCorrect = selectedIndex === quiz.answer;
 
-    // 버튼 스타일 업데이트
     const buttons = UI.optionsContainer.querySelectorAll("button");
-    buttons.forEach((btn) => (btn.disabled = true)); // 중복 클릭 방지
+    buttons.forEach((btn) => (btn.disabled = true));
 
     buttons[selectedIndex].classList.add(isCorrect ? "correct" : "wrong");
+    GameState.answeredCount++;
     if (!isCorrect) {
       buttons[quiz.answer].classList.add("correct");
+      recordWrongAnswer(quiz, "wrong");
     }
 
     if (isCorrect) {
+      GameState.correctCount++;
       handleCorrectAnswer();
     } else {
       handleWrongAnswer();
@@ -1132,21 +1553,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     showFeedback(isCorrect, quiz);
 
-    // 다음 문제로 넘어가는 것은 '다음 문제' 버튼 클릭 시 수행
-    // 단, 게임오버 체크는 handleWrongAnswer에서 수행됨
-    // 만약 게임오버라면 showFeedback 이후 다음 버튼 누르면 결과창으로 가거나
-    // 여기서 즉시 종료 처리?
-    // UX: 오답 -> 해설 보기 -> 다음 누르면 -> 실패 화면
-    // 하지만 checkGameOver가 true를 반환하면 이미 endGame이 호출됨.
-    // endGame 호출 시 피드백이 가려지거나 할 수 있음.
-    // endGame에서 feedback을 hidden 처리함.
-    // 그러므로 즉시 종료됨.
-
-    if (!isCorrect && GameState.hp <= 0) {
-      // 잠시 후 종료 (해설을 볼 시간을 줄지, 즉시 종료할지 결정)
-      // 여기서는 즉시 종료 (기존 로직 따름)
-      // checkGameOver() 호출은 handleWrongAnswer에서 함.
-    } else {
+    const isOver = !isCorrect && GameState.hp <= 0;
+    if (!isOver) {
       GameState.currentQuizIndex++;
     }
   }
@@ -1160,9 +1568,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     GameState.score += baseScore + comboBonus + timeBonus;
     GameState.combo++;
+    if (GameState.combo > GameState.maxCombo) {
+      GameState.maxCombo = GameState.combo;
+    }
 
-    // 실시간으로 점수에 따른 캐릭터 외형 업데이트
+    showScorePopup(baseScore, comboBonus, timeBonus);
     applyCharacterStyle(GameState.score);
+    maybeCelebrateRankUp();
 
     // 콤보 팝업 애니메이션
     if (GameState.combo > 1) {
@@ -1275,36 +1687,54 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function showFeedback(isCorrect, quiz) {
+  function showFeedback(isCorrect, quiz, customMessage) {
     if (!UI.feedback) return;
 
     UI.feedback.classList.remove("hidden");
 
     if (isCorrect) {
-      UI.feedbackMessage.textContent = "정답입니다! 훌륭해요!";
+      UI.feedbackMessage.textContent = customMessage || "정답입니다! 훌륭해요!";
       UI.feedbackMessage.style.color = "var(--success)";
       UI.feedbackIcon.textContent = "⭕";
       UI.feedbackIcon.style.borderColor = "var(--success)";
     } else {
-      UI.feedbackMessage.textContent = "오답입니다. 힘내세요!";
+      UI.feedbackMessage.textContent =
+        customMessage || "오답입니다. 해설을 읽고 다음으로!";
       UI.feedbackMessage.style.color = "var(--error)";
       UI.feedbackIcon.textContent = "❌";
       UI.feedbackIcon.style.borderColor = "var(--error)";
     }
 
-    UI.explanationText.textContent = quiz.explanation || "해설이 없습니다.";
+    const why = (quiz && quiz.explanation) || "해설이 없습니다.";
+    UI.explanationText.innerHTML = `<strong class="explain-label">📘 왜 그럴까요?</strong> ${why}`;
+
+    if (GameState.pendingFail && UI.nextBtn) {
+      UI.nextBtn.innerHTML =
+        "<span>결과 보기</span><span class=\"arrow\">→</span>";
+    }
   }
 
   function checkGameOver() {
-    // 게임 중이 아닐 때(이미 종료되었거나 시작 전)는 체크하지 않음
     if (GameState.gameStatus !== "PLAYING") return false;
 
     if (GameState.hp <= 0) {
-      // 즉시 종료
-      setTimeout(() => endGame(false), 500);
+      // 즉시 종료하지 않고 해설을 본 뒤 '결과 보기'로 이동
+      GameState.pendingFail = true;
+      if (UI.nextBtn) {
+        UI.nextBtn.innerHTML =
+          "<span>결과 보기</span><span class=\"arrow\">→</span>";
+      }
       return true;
     }
     return false;
+  }
+
+  function handleNextButton() {
+    if (GameState.pendingFail) {
+      endGame(false);
+      return;
+    }
+    loadNextQuiz();
   }
 
   function updateHUD() {
@@ -1336,13 +1766,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function endGame(isClear) {
     GameState.gameStatus = "END";
+    GameState.pendingFail = false;
     clearInterval(GameState.timer);
     SoundManager.stop("bgm");
     document.body.classList.remove("boss-mode");
 
     if (UI.feedback) UI.feedback.classList.add("hidden");
 
-    // 점수 저장 (Local Ranking)
+    // 점수 저장 (Local Ranking) — 0점도 기록해 재도전 동기 부여
     RankingManager.saveScore(GameState.playerName, GameState.score);
 
     // 결과 비디오 재생
@@ -1356,6 +1787,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function showResultScreen(isClear) {
     const rank = calculateRank(GameState.score);
+    const total = Math.max(QUIZ_DATA.length, 1);
+    const answered = Math.max(GameState.answeredCount, 0);
+    const earlyExit = answered > 0 && answered < total;
+    // 중도 종료(HP 소진)는 푼 문제 기준, 완주는 10문제 기준
+    const denom = earlyExit ? answered : total;
+    const accuracy = Math.round(
+      (GameState.correctCount / Math.max(denom, 1)) * 100,
+    );
+    const passAccuracy = Math.round(
+      (GameState.correctCount / total) * 100,
+    );
 
     if (UI.finalScore) UI.finalScore.textContent = GameState.score;
     if (UI.rankDisplay) {
@@ -1365,23 +1807,75 @@ document.addEventListener("DOMContentLoaded", () => {
       UI.rankDisplay.style.color = isClear ? rank.color : "#ef4444";
     }
 
+    const accuracyResult = document.getElementById("accuracy-result");
+    if (accuracyResult) {
+      accuracyResult.textContent = earlyExit
+        ? `이번 판 정답률 ${accuracy}% (${GameState.correctCount}/${answered}) · HP 소진`
+        : `정답률 ${passAccuracy}% (${GameState.correctCount}/${total}) · 합격 기준 80%`;
+      accuracyResult.style.color =
+        isClear || accuracy >= 80 ? "var(--success)" : "var(--error)";
+    }
+
+    const resultTitle = document.querySelector(".result-title");
+    const resultBadge = document.querySelector(".result-badge");
+    if (resultTitle) {
+      resultTitle.textContent = isClear ? "합격!" : "다시 도전하세요!";
+    }
+    if (resultBadge) resultBadge.textContent = isClear ? "🎉" : "💪";
+
     const circle = document.getElementById("score-circle");
     if (circle) {
-      const percentage = Math.min(GameState.score / 3000, 1);
+      const gauge = earlyExit ? accuracy : passAccuracy;
+      const percentage = Math.min(gauge / 100, 1);
       const dashoffset = 628 * (1 - percentage);
       circle.style.strokeDasharray = 628;
       circle.style.strokeDashoffset = dashoffset;
     }
 
-    // 클리어=합격 / HP 소진=다시 도전 (메시지 1회만)
     if (UI.instructorText) {
-      UI.instructorText.textContent = isClear
-        ? `${GameState.playerName} 훈련병, 합격입니다! 모든 훈련을 클리어했습니다. 계급: ${rank.title}`
-        : `${GameState.playerName} 훈련병, 다시 도전하세요! HP가 모두 소진되었습니다. 학습 후 재도전하세요.`;
+      const comboMsg =
+        GameState.maxCombo > 1 ? ` 최대 콤보 ${GameState.maxCombo}!` : "";
+      if (isClear) {
+        UI.instructorText.textContent = `${GameState.playerName} 훈련병, 합격입니다! 정답률 ${passAccuracy}%, 계급 ${rank.title}.${comboMsg}`;
+      } else if (GameState.hp <= 0 && earlyExit) {
+        UI.instructorText.textContent = `${GameState.playerName} 훈련병, HP 소진! 푼 문제 기준 정답률 ${accuracy}% (${GameState.correctCount}/${answered}). 복습 후 재도전하세요.`;
+      } else {
+        UI.instructorText.textContent = `${GameState.playerName} 훈련병, 정답률 ${passAccuracy}%로 합격선(80%) 미달! 오답을 복습하고 다시 도전하세요.`;
+      }
+    }
+
+    // 오답 리뷰
+    const reviewBox = document.getElementById("wrong-review");
+    const reviewList = document.getElementById("wrong-review-list");
+    if (reviewBox && reviewList) {
+      reviewList.innerHTML = "";
+      if (GameState.wrongAnswers.length === 0) {
+        reviewBox.classList.add("hidden");
+      } else {
+        reviewBox.classList.remove("hidden");
+        GameState.wrongAnswers.forEach((item, i) => {
+          const div = document.createElement("div");
+          div.className = "wrong-review-item";
+          div.innerHTML = `
+            <div class="wrong-review-q">${i + 1}. [${item.category}] ${item.question}</div>
+            <div class="wrong-review-a">${item.explanation || "해설 없음"}</div>
+          `;
+          reviewList.appendChild(div);
+        });
+      }
+    }
+
+    // 재도전 버튼 문구
+    if (UI.restartBtn) {
+      const label = UI.restartBtn.querySelector("span:last-child");
+      if (label) {
+        label.textContent = isClear ? "더 높은 점수 도전!" : "바로 다시 도전!";
+      }
     }
 
     showScreen("result");
     SoundManager.play(isClear ? "levelup" : "wrong");
+    applyCharacterStyle(GameState.score);
   }
 
   function calculateRank(score) {
@@ -1394,24 +1888,30 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function restartGame() {
-    // 인트로 비디오 재생 없이 바로 메인 화면으로 이동
+    // 원탭 재도전: 이름 유지하고 바로 다음 판
     SoundManager.stop("bgm");
     if (GameState.timer) clearInterval(GameState.timer);
+    document.body.classList.remove("boss-mode");
 
     if (UI.rankingModal) UI.rankingModal.classList.add("hidden");
-    showScreen("start");
 
-    // 게임 가이드 팝업을 다시 띄우고 싶다면 아래 주석 해제 (단, '다시 보지 않기' 체크 안 했을 경우만)
-    // const hideGuide = localStorage.getItem("vibe_hide_guide");
-    // if (hideGuide !== "true") {
-    //   showGuideModal();
-    // }
+    // 저장된 이름이 있으면 캐릭터 생성 스킵하고 즉시 시작
+    const savedName = localStorage.getItem("vibe_player_name");
+    if (savedName && savedName.trim().length > 0) {
+      GameState.playerName = savedName.trim();
+      handleStartButton();
+      return;
+    }
+
+    showScreen("start");
   }
 
   function shareResult() {
     const rank = UI.rankDisplay ? UI.rankDisplay.textContent : "훈련병";
     const score = GameState.score;
-    const text = `[바이브코딩 훈련소] 훈련 완료!\n계급: ${rank}\n점수: ${score}점\n나의 코딩 전투력을 확인해보세요! #바이브코딩 #코딩훈련소`;
+    const total = Math.max(QUIZ_DATA.length, 1);
+    const accuracy = Math.round((GameState.correctCount / total) * 100);
+    const text = `[바이브코딩 훈련소] 결과\n${rank}\n점수: ${score}점\n정답률: ${accuracy}% (${GameState.correctCount}/${total})\n합격 기준 80% · #바이브코딩 #코딩훈련소`;
 
     if (navigator.clipboard) {
       navigator.clipboard

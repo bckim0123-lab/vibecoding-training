@@ -1280,7 +1280,8 @@ body.boss-mode {
   transform: translateX(5px);
 }
 
-.option-idx {
+.option-idx,
+.option-index {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1300,19 +1301,193 @@ body.boss-mode {
   box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
 }
 
-.option-btn.correct .option-idx {
+.option-btn.correct .option-idx,
+.option-btn.correct .option-index {
   background: var(--success);
   color: #fff;
 }
 
-.option-btn.incorrect {
+.option-btn.incorrect,
+.option-btn.wrong {
   background: rgba(239, 68, 68, 0.2);
   border-color: var(--error);
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.3);
 }
 
-.option-btn.incorrect .option-idx {
+.option-btn.incorrect .option-idx,
+.option-btn.wrong .option-idx,
+.option-btn.incorrect .option-index,
+.option-btn.wrong .option-index {
   background: var(--error);
   color: #fff;
+}
+
+.question-category {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--bg-dark);
+  background: linear-gradient(135deg, var(--primary-cyan), #7c3aed);
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.quiz-progress-track {
+  width: 100%;
+  height: 8px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.quiz-progress-bar {
+  height: 100%;
+  width: 10%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary-cyan), #7c3aed);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.45);
+  transition: width 0.35s ease;
+}
+
+.accuracy-hud {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.score-formula {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+}
+
+.accuracy-result {
+  margin-top: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ranking-note {
+  margin: 0 0 12px;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.explain-label {
+  color: var(--primary-cyan);
+  margin-right: 6px;
+}
+
+.study-guide strong {
+  color: var(--primary-cyan);
+}
+
+.score-popup {
+  position: fixed;
+  top: 28%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10001;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  pointer-events: none;
+  animation: score-popup-anim 1.2s ease forwards;
+}
+
+.score-popup span {
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.5);
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  padding: 8px 12px;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
+}
+
+@keyframes score-popup-anim {
+  0% { opacity: 0; transform: translate(-50%, 20px); }
+  20% { opacity: 1; transform: translate(-50%, 0); }
+  80% { opacity: 1; transform: translate(-50%, -10px); }
+  100% { opacity: 0; transform: translate(-50%, -30px); }
+}
+
+.rankup-toast {
+  position: fixed;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10002;
+  padding: 14px 28px;
+  border-radius: 16px;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #0a1628;
+  background: linear-gradient(135deg, #ffd700, #00e5ff);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.5);
+  pointer-events: none;
+  animation: rankup-anim 1.6s ease forwards;
+}
+
+@keyframes rankup-anim {
+  0% { opacity: 0; transform: translate(-50%, 30px) scale(0.8); }
+  25% { opacity: 1; transform: translate(-50%, 0) scale(1.05); }
+  75% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -20px) scale(0.95); }
+}
+
+.wrong-review {
+  width: 100%;
+  margin: 20px 0;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  text-align: left;
+}
+
+.wrong-review-title {
+  margin: 0 0 12px;
+  color: #fca5a5;
+  font-size: 1.05rem;
+}
+
+.wrong-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.wrong-review-item {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.wrong-review-q {
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #fff;
+  font-size: 0.92rem;
+}
+
+.wrong-review-a {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
 /* 피드백 섹션 */
@@ -1548,12 +1723,70 @@ body.boss-mode {
   align-items: center;
   flex-shrink: 0;
   border: 2px solid var(--primary-cyan);
+  overflow: hidden;
+}
+
+.robot-avatar-result.css-robot-mini .robot-head.mini {
+  width: 44px;
+  height: 36px;
+  border-radius: 12px;
+  border: 2px solid var(--primary-cyan);
+  background: rgba(10, 22, 40, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+}
+
+.robot-avatar-result.css-robot-mini .robot-eyes {
+  gap: 8px;
+}
+
+.robot-avatar-result.css-robot-mini .eye {
+  width: 8px;
+  height: 8px;
 }
 
 .avatar-img-small {
   width: 40px;
   height: 40px;
   object-fit: contain;
+}
+
+.option-btn.eliminated,
+.option-btn.study-hint {
+  opacity: 0.35;
+  text-decoration: line-through;
+  pointer-events: none;
+  filter: grayscale(0.6);
+}
+
+.option-btn.study-hint::after {
+  content: "학습힌트";
+  display: block;
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  color: var(--primary-cyan);
+  text-decoration: none;
+  margin-top: 4px;
+}
+
+.seed-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #0a1628;
+  background: rgba(148, 163, 184, 0.85);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.study-card:focus-visible {
+  outline: 2px solid var(--primary-cyan);
+  outline-offset: 3px;
 }
 
 .instructor-message {
@@ -1625,9 +1858,23 @@ body.boss-mode {
   }
 
   .timer-container {
-    order: 3;
-    width: 100%;
-    margin: 10px 0 0 0;
+    order: 0;
+    width: auto;
+    flex: 1;
+    margin: 0;
+    min-width: 120px;
+  }
+
+  .game-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .feedback-container {
+    position: sticky;
+    bottom: 8px;
+    z-index: 5;
   }
 }
 
@@ -1904,8 +2151,18 @@ body.boss-mode .option-btn:hover {
     }
 
     .robot-section {
-        min-height: 350px; /* 모바일에서 높이 축소 */
+        min-height: 220px; /* 모바일에서 높이 축소 */
         order: -1; /* 로봇을 위로 */
+    }
+
+    .css-robot-container {
+        transform: scale(0.85);
+    }
+
+    .question-category {
+        display: block;
+        margin: 8px 0 0;
+        width: fit-content;
     }
 
     .character-display-section {

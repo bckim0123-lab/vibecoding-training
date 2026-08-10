@@ -88,6 +88,7 @@
           <button class="rank-tab active" data-filter="all">ALL TIME</button>
           <button class="rank-tab" data-filter="weekly">WEEKLY</button>
         </div>
+        <p class="ranking-note">※ 랭킹은 이 브라우저에 저장됩니다. ALL TIME의 NPC는 참고용이며, WEEKLY는 실제 기록만 표시됩니다.</p>
 
         <div class="ranking-list-header arcade-header">
           <span class="rank-col-rank">RANK</span>
@@ -108,15 +109,16 @@
       <div class="guide-content card-3d">
         <h2 class="guide-title">📢 훈련 지침</h2>
         <div class="guide-text">
-          <p>1. 총 10개의 문제가 랜덤하게 출제됩니다.</p>
-          <p>2. 제한 시간 내에 정답을 선택하세요.</p>
+          <p>1. 총 10문제가 과목 밸런스 있게 랜덤 출제됩니다.</p>
+          <p>2. 기본 15초(+학습 보너스) 안에 고르세요. 빨리 맞출수록 시간 보너스!</p>
           <p>
             3.
             <span class="warning-text"
-              >하트 3개가 모두 소진되면 훈련 실패 처리됩니다.</span
+              >하트 소진 또는 정답률 80% 미만이면 실패입니다.</span
             >
           </p>
-          <p>4. 높은 점수로 진급에 도전하세요!</p>
+          <p>4. 정답 = 100점 + 콤보 + 시간보너스. 진급하며 캐릭터가 성장!</p>
+          <p>5. 학습한 과목 문제는 오답 보기 1개가 미리 제거됩니다.</p>
         </div>
         <div class="guide-options">
           <label class="checkbox-label">
@@ -249,9 +251,9 @@
               <div class="welcome-icon">👋</div>
               <p>
                 안녕하세요, 훈련병! 저는
-                <strong class="highlight">바이브 코칭</strong>입니다.
-                바이브코딩의 세계에 오신 것을 환영합니다! 다재다능한 바이브 코딩
-                실력을 갖게 되실 것을 환영합니다! 👍
+                <strong class="highlight">바이브 코치</strong>입니다.
+                과목을 학습한 뒤 10문제 훈련에 도전하세요. 학습할수록 타이머·힌트
+                보너스가 쌓입니다.
               </p>
             </div>
 
@@ -265,64 +267,20 @@
               <!-- 학습하기 섹션 -->
               <div class="study-section">
                 <p class="study-guide">
-                  ※ 훈련 전 아래 내용을 클릭하여 학습하세요.
+                  ※ 과목을 열면 <strong>핵심 정리 + 실전 TIP + 미니퀴즈</strong>가 나옵니다.
+                  학습 완료마다 <strong>타이머 +2초</strong>, 해당 과목 문제에
+                  <strong>오답 보기 힌트</strong>가 적용됩니다. 전 과목 완료 시
+                  <strong>HP +1</strong>!
                 </p>
                 <div class="study-grid" id="study-grid">
                   <!-- JS로 동적 생성됨 -->
                 </div>
               </div>
 
-              <div class="modules-grid hidden">
-                <div class="module-card card-3d" data-module="1">
-                  <div class="module-header">
-                    <span class="module-icon">📝</span>
-                    <span class="module-badge">핵심 개념</span>
-                  </div>
-                  <p class="module-desc">디렉팅, Vibe Loop, 검증 책임</p>
-                  <div class="module-shine"></div>
-                </div>
-
-                <div class="module-card card-3d" data-module="2">
-                  <div class="module-header">
-                    <span class="module-icon">🎨</span>
-                    <span class="module-badge">개발 기초</span>
-                  </div>
-                  <p class="module-desc">프론트엔드, 백엔드, API, DB</p>
-                  <div class="module-shine"></div>
-                </div>
-
-                <div class="module-card card-3d" data-module="3">
-                  <div class="module-header">
-                    <span class="module-icon">🤖</span>
-                    <span class="module-badge">AI 용어</span>
-                  </div>
-                  <p class="module-desc">
-                    LLM, 프롬프트, 컨텍스트 윈도우, 할루시네이션
-                  </p>
-                  <div class="module-shine"></div>
-                </div>
-
-                <div class="module-card card-3d" data-module="4">
-                  <div class="module-header">
-                    <span class="module-icon">🛠️</span>
-                    <span class="module-badge">실전 도구</span>
-                  </div>
-                  <p class="module-desc">Cursor Agent, Claude Code, Rules, MCP</p>
-                  <div class="module-shine"></div>
-                </div>
-              </div>
             </div>
 
             <!-- 시작 버튼 -->
-            <button
-              id="start-btn"
-              class="start-button"
-              onclick="
-                if (window.showCharacterCreation)
-                  window.showCharacterCreation();
-                else console.error('showCharacterCreation not defined');
-              "
-            >
+            <button id="start-btn" class="start-button" type="button">
               <span class="button-content">
                 <span class="button-icon">🚀</span>
                 <span class="button-text">전투 배치 (Deploy)</span>
@@ -361,6 +319,7 @@
             <div class="score-container">
               <span class="score-label">SCORE</span>
               <span class="score-value" id="current-score">0</span>
+              <span class="score-formula">+100 · 콤보 · 시간</span>
             </div>
           </div>
           <div class="combo-container hidden" id="combo-container">
@@ -383,7 +342,12 @@
             <div class="progress-section">
               <div class="progress-info">
                 <span id="question-number" class="question-num">문제 1/10</span>
+                <span id="question-category" class="question-category">기초 이론</span>
               </div>
+              <div class="quiz-progress-track">
+                <div id="quiz-progress-bar" class="quiz-progress-bar"></div>
+              </div>
+              <div id="accuracy-hud" class="accuracy-hud">정답률 100% (0/0) · 합격 80%</div>
             </div>
           </div>
 
@@ -446,6 +410,7 @@
                 <span class="score-label">점</span>
               </div>
             </div>
+            <p id="accuracy-result" class="accuracy-result">정답률 0% (0/10) · 합격 기준 80%</p>
           </div>
 
           <div class="result-character-display">
@@ -458,19 +423,25 @@
           </div>
 
           <div class="result-feedback card-3d">
-            <div class="robot-avatar-result">
-              <img
-                src="assets/robot-instructor.png"
-                alt="AI 교관"
-                class="avatar-img-small"
-              />
+            <div class="robot-avatar-result css-robot-mini" aria-hidden="true">
+              <div class="robot-head mini">
+                <div class="robot-eyes">
+                  <div class="eye left-eye"></div>
+                  <div class="eye right-eye"></div>
+                </div>
+              </div>
             </div>
             <p id="instructor-text" class="instructor-message"></p>
           </div>
 
+          <div id="wrong-review" class="wrong-review hidden">
+            <h4 class="wrong-review-title">📝 오답 복습</h4>
+            <div id="wrong-review-list" class="wrong-review-list"></div>
+          </div>
+
           <button id="restart-btn" class="restart-button">
             <span class="button-icon">🔄</span>
-            <span>다시 도전하기</span>
+            <span>바로 다시 도전!</span>
           </button>
 
           <button
@@ -490,8 +461,6 @@
       </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/particles.js/2.0.0/particles.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
     <script src="quiz_data.js"></script>
     <script src="app.js"></script>
