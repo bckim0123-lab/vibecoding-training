@@ -45,6 +45,6 @@ vibecoding training/
 ├── app.js              # 퀴즈 로직 및 애니메이션
 ├── index.html          # 메인 구조
 ├── style.css           # 스타일 및 반응형 디자인
-├── quiz_data.json      # 퀴즈 데이터
+├── quiz_data.js        # 퀴즈/학습 데이터 (QUIZ_SOURCE)
 └── README.md           # 프로젝트 문서
 ```

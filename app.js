@@ -35,6 +35,10 @@ document.addEventListener("DOMContentLoaded", () => {
     quizOrder: [],
     skillUsed: false,
     isBossMode: false,
+    lastTimerSound: 0,
+    // 캐릭터 정보
+    playerName: "훈련병",
+    playerColor: "cyan",
   };
 
   // ==========================================================================
@@ -239,6 +243,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ==========================================================================
 
   const Screens = {
+    character: document.getElementById("character-screen"),
     start: document.getElementById("start-screen"),
     quiz: document.getElementById("quiz-screen"),
     result: document.getElementById("result-screen"),
@@ -294,6 +299,20 @@ document.addEventListener("DOMContentLoaded", () => {
     studyTitle: document.getElementById("study-title"),
     studyBody: document.getElementById("study-body"),
     studyGrid: document.getElementById("study-grid"),
+
+    // Character Modal
+    charModal: document.getElementById("character-screen"),
+    charNameInput: document.getElementById("char-name-input"),
+    charColorBtns: document.querySelectorAll(".color-btn"),
+    charCreateBtn: document.getElementById("char-create-btn"),
+    previewRobot: document.getElementById("preview-robot"),
+
+    // Ranking Modal
+    rankingModal: document.getElementById("ranking-modal"),
+    rankingList: document.getElementById("ranking-list"),
+    closeRankingBtn: document.getElementById("close-ranking-btn"),
+    showRankingBtn: document.getElementById("show-ranking-btn"),
+    rankTabs: document.querySelectorAll(".rank-tab"),
   };
 
   // ==========================================================================
@@ -316,13 +335,43 @@ document.addEventListener("DOMContentLoaded", () => {
     if (UI.skipBtn)
       UI.skipBtn.addEventListener("click", () => VideoManager.skip());
     // Start Button -> Show Guide or Start Game
-    if (UI.startBtn) UI.startBtn.addEventListener("click", handleStartButton);
+    if (UI.startBtn) {
+      UI.startBtn.addEventListener("click", showCharacterCreation);
+    }
     if (UI.guideStartBtn) UI.guideStartBtn.addEventListener("click", startGame);
 
     if (UI.restartBtn) UI.restartBtn.addEventListener("click", restartGame);
     if (UI.shareBtn) UI.shareBtn.addEventListener("click", shareResult);
     if (UI.nextBtn) UI.nextBtn.addEventListener("click", loadNextQuiz);
     if (UI.skillBtn) UI.skillBtn.addEventListener("click", useSkill);
+
+    // Character Creation Events
+    if (UI.charCreateBtn)
+      UI.charCreateBtn.addEventListener("click", completeCharacterCreation);
+    if (UI.charColorBtns) {
+      UI.charColorBtns.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          const color = e.target.dataset.color;
+          selectCharacterColor(color);
+        });
+      });
+    }
+
+    // Ranking Events
+    if (UI.showRankingBtn)
+      UI.showRankingBtn.addEventListener("click", showRankingBoard);
+    if (UI.closeRankingBtn)
+      UI.closeRankingBtn.addEventListener("click", () =>
+        UI.rankingModal.classList.add("hidden"),
+      );
+    if (UI.rankTabs) {
+      UI.rankTabs.forEach((tab) => {
+        tab.addEventListener("click", (e) => {
+          const filter = e.target.dataset.filter;
+          updateRankingTab(filter);
+        });
+      });
+    }
 
     // Study Modal Event Listeners
     if (UI.closeStudyBtn) {
@@ -331,6 +380,9 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("click", (e) => {
       if (e.target === UI.studyModal) {
         closeStudyModal();
+      }
+      if (e.target === UI.rankingModal) {
+        UI.rankingModal.classList.add("hidden");
       }
     });
 
@@ -481,6 +533,240 @@ document.addEventListener("DOMContentLoaded", () => {
     if (UI.studyModal) UI.studyModal.classList.add("hidden");
   }
 
+  // --- Character Creation Logic ---
+  window.showCharacterCreation = function () {
+    const screen = document.getElementById("character-screen");
+    if (!screen) return;
+    showScreen("character");
+    updateRobotPreview(0);
+    const nameInput = document.getElementById("char-name-input");
+    if (nameInput) nameInput.value = "";
+  };
+
+  // 내부 함수 유지를 위해 (기존 참조 호환성)
+  function showCharacterCreation() {
+    window.showCharacterCreation();
+  }
+
+  // 색상 선택 함수 제거됨 -> 점수 기반 스타일 업데이트 함수로 대체
+  function updateRobotPreview(score) {
+    const img = document.getElementById("preview-character-img");
+    if (!img) return;
+
+    if (score >= 2000) {
+      img.src = "assets/char_master.png";
+      img.classList.add("rank-master");
+    } else if (score >= 1000) {
+      img.src = "assets/char_elite.png";
+      img.classList.remove("rank-master");
+    } else if (score >= 300) {
+      img.src = "assets/char_soldier.png";
+      img.classList.remove("rank-master");
+    } else {
+      img.src = "assets/char_recruit.png";
+      img.classList.remove("rank-master");
+    }
+  }
+
+  function completeCharacterCreation() {
+    const name = UI.charNameInput.value.trim();
+    if (name.length < 1) {
+      alert("이름을 입력해주세요.");
+      return;
+    }
+
+    GameState.playerName = name;
+    showScreen("start");
+    applyCharacterStyle(0);
+    handleStartButton();
+  }
+
+  function applyCharacterStyle(score) {
+    const ingameImg = document.getElementById("ingame-character-img");
+    const resultImg = document.getElementById("result-character-img");
+
+    const updateImage = (img) => {
+      if (!img) return;
+
+      if (score >= 2000) {
+        img.src = "assets/char_master.png";
+      } else if (score >= 1000) {
+        img.src = "assets/char_elite.png";
+      } else if (score >= 300) {
+        img.src = "assets/char_soldier.png";
+      } else {
+        img.src = "assets/char_recruit.png";
+      }
+    };
+
+    updateImage(ingameImg);
+    updateImage(resultImg);
+  }
+
+  // --- Ranking Logic (시드 고정 + localStorage 영구 저장) ---
+  const SEED_RANKINGS = [
+    { name: "바이브교관", score: 2800, date: "2026-01-15T10:00:00.000Z", seed: true },
+    { name: "디렉터김", score: 2400, date: "2026-01-20T12:00:00.000Z", seed: true },
+    { name: "Cursor마스터", score: 2100, date: "2026-02-01T09:30:00.000Z", seed: true },
+    { name: "프롬프트왕", score: 1800, date: "2026-02-10T14:00:00.000Z", seed: true },
+    { name: "검증병장", score: 1500, date: "2026-02-28T16:45:00.000Z", seed: true },
+    { name: "루프훈련병", score: 1200, date: "2026-03-05T11:20:00.000Z", seed: true },
+    { name: "MCP탐험가", score: 900, date: "2026-03-12T08:10:00.000Z", seed: true },
+    { name: "Git세이브", score: 600, date: "2026-03-20T19:00:00.000Z", seed: true },
+  ];
+
+  const RankingManager = {
+    storageKey: "vibecoding_ranking_v2",
+    maxStored: 50,
+
+    ensureSeeded(list) {
+      const hasSeed = list.some((r) => r.seed === true);
+      if (list.length === 0 || !hasSeed) {
+        return this.mergeAndSort([...SEED_RANKINGS, ...list]);
+      }
+      return this.mergeAndSort(list);
+    },
+
+    mergeAndSort(list) {
+      // 같은 이름은 최고점만 유지 (시드는 이름 충돌 시 더 높은 점수 우선)
+      const bestByName = new Map();
+      list.forEach((entry) => {
+        const key = (entry.name || "훈련병").trim();
+        const prev = bestByName.get(key);
+        if (!prev || entry.score > prev.score) {
+          bestByName.set(key, { ...entry, name: key });
+        }
+      });
+      return Array.from(bestByName.values()).sort((a, b) => b.score - a.score);
+    },
+
+    persist(rankings) {
+      const trimmed = rankings.slice(0, this.maxStored);
+      try {
+        localStorage.setItem(this.storageKey, JSON.stringify(trimmed));
+      } catch (e) {
+        console.warn("랭킹 저장 실패:", e);
+      }
+      return trimmed;
+    },
+
+    saveScore(name, score) {
+      const newEntry = {
+        name: (name || "훈련병").trim(),
+        score: score,
+        date: new Date().toISOString(),
+        seed: false,
+      };
+
+      let rankings = this.getRankings();
+      rankings.push(newEntry);
+      rankings = this.mergeAndSort(rankings);
+      this.persist(rankings);
+    },
+
+    getRankings() {
+      let parsed = [];
+      try {
+        const data = localStorage.getItem(this.storageKey);
+        parsed = data ? JSON.parse(data) : [];
+        if (!Array.isArray(parsed)) parsed = [];
+      } catch (e) {
+        parsed = [];
+      }
+
+      // 구버전 키 마이그레이션
+      if (parsed.length === 0) {
+        try {
+          const legacy = localStorage.getItem("vibecoding_ranking_v1");
+          if (legacy) {
+            const legacyParsed = JSON.parse(legacy);
+            if (Array.isArray(legacyParsed) && legacyParsed.length > 0) {
+              parsed = legacyParsed;
+            }
+          }
+        } catch (e) {
+          /* ignore */
+        }
+      }
+
+      const withSeed = this.ensureSeeded(parsed);
+      // 비어 있었거나 시드가 빠져 있으면 즉시 고정 저장
+      this.persist(withSeed);
+      return withSeed;
+    },
+
+    getFilteredRankings(filter) {
+      let all = this.getRankings();
+      const now = new Date();
+
+      if (filter === "monthly") {
+        return all.filter((r) => {
+          if (r.seed) return true; // 시드는 항상 노출
+          const d = new Date(r.date);
+          return (
+            d.getMonth() === now.getMonth() &&
+            d.getFullYear() === now.getFullYear()
+          );
+        });
+      } else if (filter === "weekly") {
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        return all.filter((r) => {
+          if (r.seed) return true; // 시드는 항상 노출
+          return new Date(r.date) >= oneWeekAgo;
+        });
+      }
+
+      return all;
+    },
+  };
+
+  function showRankingBoard() {
+    UI.rankingModal.classList.remove("hidden");
+    updateRankingTab("all");
+  }
+
+  function updateRankingTab(filter) {
+    // 탭 UI 업데이트
+    UI.rankTabs.forEach((tab) => {
+      if (tab.dataset.filter === filter) tab.classList.add("active");
+      else tab.classList.remove("active");
+    });
+
+    const data = RankingManager.getFilteredRankings(filter);
+    renderRankingList(data);
+  }
+
+  function renderRankingList(data) {
+    UI.rankingList.innerHTML = "";
+
+    if (data.length === 0) {
+      UI.rankingList.innerHTML = `<div class="empty-rank">NO RECORD</div>`;
+      return;
+    }
+
+    data.slice(0, 10).forEach((item, index) => {
+      const div = document.createElement("div");
+      div.className = "rank-item arcade-item"; // 아케이드 스타일 클래스 추가
+
+      const dateStr = new Date(item.date).toLocaleDateString();
+
+      // 1~3위 특별 아이콘
+      let rankIcon = index + 1;
+      if (index === 0) rankIcon = "1ST 👑";
+      if (index === 1) rankIcon = "2ND";
+      if (index === 2) rankIcon = "3RD";
+
+      div.innerHTML = `
+            <span class="rank-col-rank">${rankIcon}</span>
+            <span class="rank-col-name">${item.name}</span>
+            <span class="rank-col-score">${item.score.toLocaleString()}</span>
+            <span class="rank-col-date">${dateStr}</span>
+          `;
+
+      UI.rankingList.appendChild(div);
+    });
+  }
+
   // --- Quiz Generation Logic ---
   function generateQuizData() {
     if (typeof QUIZ_SOURCE === "undefined") return [];
@@ -499,7 +785,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // 전체 문제 셔플
     shuffleArray(allQuestions);
 
-    // 10문제 선택 (문제가 부족하면 전체 선택)
     const selectedQuestions = allQuestions.slice(0, 10);
 
     // 각 문제에 대해 보기 셔플 및 정답 인덱스 업데이트
@@ -628,17 +913,24 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!quiz) return;
 
     // Boss Mode Check (10번 문제)
-    if (GameState.currentQuizIndex === 9 || quiz.difficulty === "Boss") {
+    if (
+      GameState.currentQuizIndex === QUIZ_DATA.length - 1 ||
+      quiz.difficulty === "Boss"
+    ) {
       document.body.classList.add("boss-mode");
       GameState.isBossMode = true;
-      
+
       if (SoundManager.bgmOscillators.length > 0) {
-          const ctx = SoundManager.audioContext;
-          SoundManager.bgmOscillators.forEach(osc => {
-              if (osc.frequency.value < 150) { // Base A2 is 110
-                 osc.frequency.linearRampToValueAtTime(osc.frequency.value * 1.5, ctx.currentTime + 2);
-              }
-          });
+        const ctx = SoundManager.audioContext;
+        SoundManager.bgmOscillators.forEach((osc) => {
+          if (osc.frequency.value < 150) {
+            // Base A2 is 110
+            osc.frequency.linearRampToValueAtTime(
+              osc.frequency.value * 1.5,
+              ctx.currentTime + 2,
+            );
+          }
+        });
       }
     } else {
       document.body.classList.remove("boss-mode");
@@ -798,7 +1090,7 @@ document.addEventListener("DOMContentLoaded", () => {
     SoundManager.play("wrong");
     GameState.combo = 0;
     GameState.hp--;
-    
+
     // 시각 효과: 화면 흔들림 (Screen Shake)
     document.body.classList.remove("shake");
     void document.body.offsetWidth;
@@ -869,6 +1161,9 @@ document.addEventListener("DOMContentLoaded", () => {
     GameState.score += baseScore + comboBonus + timeBonus;
     GameState.combo++;
 
+    // 실시간으로 점수에 따른 캐릭터 외형 업데이트
+    applyCharacterStyle(GameState.score);
+
     // 콤보 팝업 애니메이션
     if (GameState.combo > 1) {
       const comboText = document.createElement("div");
@@ -880,16 +1175,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Confetti Effect (canvas-confetti)
     if (typeof confetti === "function") {
-      const rect = UI.optionsContainer.querySelector(".correct").getBoundingClientRect();
+      const rect = UI.optionsContainer
+        .querySelector(".correct")
+        .getBoundingClientRect();
       const x = (rect.left + rect.width / 2) / window.innerWidth;
       const y = (rect.top + rect.height / 2) / window.innerHeight;
-      
+
       confetti({
         particleCount: 50,
         spread: 60,
         origin: { x, y },
         colors: ["#00e5ff", "#ff00de", "#ff1493"],
-        disableForReducedMotion: true
+        disableForReducedMotion: true,
       });
     }
 
@@ -1045,6 +1342,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (UI.feedback) UI.feedback.classList.add("hidden");
 
+    // 점수 저장 (Local Ranking)
+    RankingManager.saveScore(GameState.playerName, GameState.score);
+
     // 결과 비디오 재생
     const videoId = isClear ? "pass-video" : "fail-video";
 
@@ -1059,24 +1359,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (UI.finalScore) UI.finalScore.textContent = GameState.score;
     if (UI.rankDisplay) {
-      UI.rankDisplay.textContent = rank.title;
-      UI.rankDisplay.style.color = rank.color;
+      UI.rankDisplay.textContent = isClear
+        ? `합격 · ${rank.title}`
+        : `다시 도전하세요 · ${rank.title}`;
+      UI.rankDisplay.style.color = isClear ? rank.color : "#ef4444";
     }
 
-    // 점수 원형 그래프 효과 (간단히 구현)
     const circle = document.getElementById("score-circle");
     if (circle) {
-      // 최대 점수 대략 3000점 기준
       const percentage = Math.min(GameState.score / 3000, 1);
-      const dashoffset = 628 * (1 - percentage); // 2 * pi * r (r=100)
+      const dashoffset = 628 * (1 - percentage);
       circle.style.strokeDasharray = 628;
       circle.style.strokeDashoffset = dashoffset;
     }
 
+    // 클리어=합격 / HP 소진=다시 도전 (메시지 1회만)
     if (UI.instructorText) {
       UI.instructorText.textContent = isClear
-        ? "훌륭합니다! 모든 훈련을 성공적으로 마쳤습니다."
-        : "훈련 실패! 다시 도전하여 더 강해지세요.";
+        ? `${GameState.playerName} 훈련병, 합격입니다! 모든 훈련을 클리어했습니다. 계급: ${rank.title}`
+        : `${GameState.playerName} 훈련병, 다시 도전하세요! HP가 모두 소진되었습니다. 학습 후 재도전하세요.`;
     }
 
     showScreen("result");
@@ -1097,6 +1398,7 @@ document.addEventListener("DOMContentLoaded", () => {
     SoundManager.stop("bgm");
     if (GameState.timer) clearInterval(GameState.timer);
 
+    if (UI.rankingModal) UI.rankingModal.classList.add("hidden");
     showScreen("start");
 
     // 게임 가이드 팝업을 다시 띄우고 싶다면 아래 주석 해제 (단, '다시 보지 않기' 체크 안 했을 경우만)
@@ -1130,6 +1432,9 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("결과가 클립보드에 복사되었습니다!");
     }
   }
+
+  // 랭킹 시드 고정 저장 (빈 보드 방지)
+  RankingManager.getRankings();
 
   // 초기화
   initGame();

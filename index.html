@@ -76,6 +76,33 @@
       </div>
     </div>
 
+    <!-- 랭킹 모달 -->
+    <div id="ranking-modal" class="ranking-modal hidden">
+      <div class="ranking-content arcade-style card-3d">
+        <div class="ranking-header">
+          <h2 class="ranking-title arcade-title">HIGH SCORES</h2>
+          <button id="close-ranking-btn" class="close-btn">×</button>
+        </div>
+
+        <div class="ranking-tabs">
+          <button class="rank-tab active" data-filter="all">ALL TIME</button>
+          <button class="rank-tab" data-filter="weekly">WEEKLY</button>
+        </div>
+
+        <div class="ranking-list-header arcade-header">
+          <span class="rank-col-rank">RANK</span>
+          <span class="rank-col-name">NAME</span>
+          <span class="rank-col-score">SCORE</span>
+          <span class="rank-col-date">DATE</span>
+        </div>
+
+        <div id="ranking-list" class="ranking-list arcade-list">
+          <!-- 랭킹 아이템들이 JS로 생성됨 -->
+          <div class="empty-rank">INSERT COIN...</div>
+        </div>
+      </div>
+    </div>
+
     <!-- 게임 가이드 팝업 (Start Button 누르면 표시) -->
     <div id="game-guide-modal" class="guide-modal hidden">
       <div class="guide-content card-3d">
@@ -105,6 +132,40 @@
     </div>
 
     <div class="container">
+      <div id="character-screen" class="screen character-screen">
+        <div class="character-content card-3d">
+          <h2 class="character-title">신규 훈련병 등록</h2>
+          <div class="character-preview">
+            <div class="character-img-container" id="preview-robot-container">
+              <img
+                id="preview-character-img"
+                src="assets/char_recruit.png"
+                alt="Character Preview"
+                class="pixel-character"
+              />
+            </div>
+          </div>
+
+          <div class="character-form">
+            <div class="input-group">
+              <label>코드네임 (이름)</label>
+              <input
+                type="text"
+                id="char-name-input"
+                placeholder="신병 이름을 입력하라"
+                maxlength="8"
+                autocomplete="off"
+              />
+            </div>
+            <div class="equipment-info">
+              <p>※ 초기 장비: 민무늬 훈련복</p>
+              <p>※ 훈련 성과에 따라 장비가 업그레이드됩니다.</p>
+            </div>
+          </div>
+
+          <button id="char-create-btn" class="guide-btn">등록 완료</button>
+        </div>
+      </div>
       <!-- 메인 화면 -->
       <div id="start-screen" class="screen active">
         <div class="main-content">
@@ -130,14 +191,11 @@
             </div>
 
             <div class="css-robot-container" id="css-robot">
-              <!-- 안테나 -->
               <div class="robot-antenna">
                 <div class="antenna-ball"></div>
               </div>
-
-              <!-- 머리 -->
               <div class="robot-head">
-                <div class="head-display">READY</div>
+                <div class="head-display">COACH</div>
                 <div class="robot-eyes">
                   <div class="eye left-eye"></div>
                   <div class="eye right-eye"></div>
@@ -146,11 +204,9 @@
                 <div class="robot-cheek left-cheek"></div>
                 <div class="robot-cheek right-cheek"></div>
               </div>
-
-              <!-- 몸통 -->
               <div class="robot-body">
                 <div class="body-star">⭐</div>
-                <div class="body-display">STANDBY</div>
+                <div class="body-display">COACH</div>
                 <div class="body-screen"></div>
                 <div class="body-leds">
                   <div class="led red-led"></div>
@@ -222,7 +278,7 @@
                     <span class="module-icon">📝</span>
                     <span class="module-badge">핵심 개념</span>
                   </div>
-                  <p class="module-desc">바이브 코딩의 정의와 패러다임</p>
+                  <p class="module-desc">디렉팅, Vibe Loop, 검증 책임</p>
                   <div class="module-shine"></div>
                 </div>
 
@@ -241,7 +297,7 @@
                     <span class="module-badge">AI 용어</span>
                   </div>
                   <p class="module-desc">
-                    LLM, 프롬프트, 컨텍스트, 할루시네이션
+                    LLM, 프롬프트, 컨텍스트 윈도우, 할루시네이션
                   </p>
                   <div class="module-shine"></div>
                 </div>
@@ -251,14 +307,22 @@
                     <span class="module-icon">🛠️</span>
                     <span class="module-badge">실전 도구</span>
                   </div>
-                  <p class="module-desc">Cursor, Claude Code, Antigravity</p>
+                  <p class="module-desc">Cursor Agent, Claude Code, Rules, MCP</p>
                   <div class="module-shine"></div>
                 </div>
               </div>
             </div>
 
             <!-- 시작 버튼 -->
-            <button id="start-btn" class="start-button">
+            <button
+              id="start-btn"
+              class="start-button"
+              onclick="
+                if (window.showCharacterCreation)
+                  window.showCharacterCreation();
+                else console.error('showCharacterCreation not defined');
+              "
+            >
               <span class="button-content">
                 <span class="button-icon">🚀</span>
                 <span class="button-text">전투 배치 (Deploy)</span>
@@ -305,6 +369,17 @@
           </div>
 
           <div class="quiz-header">
+            <div class="ingame-character-wrapper">
+              <div class="ingame-character-container">
+                <img
+                  id="ingame-character-img"
+                  src="assets/char_recruit.png"
+                  alt="My Character"
+                  class="pixel-character ingame-size"
+                />
+              </div>
+              <div class="ingame-character-label">ME</div>
+            </div>
             <div class="progress-section">
               <div class="progress-info">
                 <span id="question-number" class="question-num">문제 1/10</span>
@@ -320,15 +395,12 @@
           </div>
 
           <div class="skills-container">
-            <button
-              id="skill-btn"
-              class="skill-btn"
-              title="AI Co-pilot: 오답 2개 제거"
-            >
+            <button id="skill-btn" class="skill-btn">
               <span class="skill-icon">🤖</span>
               <span class="skill-name">AI Co-pilot</span>
               <span class="skill-status" id="skill-status">READY</span>
             </button>
+            <p class="skill-desc">오답 2개 제거 도움</p>
           </div>
 
           <div id="feedback" class="feedback-container hidden">
@@ -376,6 +448,15 @@
             </div>
           </div>
 
+          <div class="result-character-display">
+            <img
+              id="result-character-img"
+              src="assets/char_recruit.png"
+              alt="Final Character"
+              class="pixel-character result-size"
+            />
+          </div>
+
           <div class="result-feedback card-3d">
             <div class="robot-avatar-result">
               <img
@@ -390,6 +471,15 @@
           <button id="restart-btn" class="restart-button">
             <span class="button-icon">🔄</span>
             <span>다시 도전하기</span>
+          </button>
+
+          <button
+            id="show-ranking-btn"
+            class="share-button"
+            style="background: var(--purple)"
+          >
+            <span class="button-icon">🏆</span>
+            <span>랭킹 확인하기</span>
           </button>
 
           <button id="share-btn" class="share-button">
